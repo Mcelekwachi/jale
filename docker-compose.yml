@@ -1,0 +1,69 @@
+# Local development stack.
+#
+#   docker compose up            # db + seed + api on http://localhost:8000/docs
+#   docker compose run --rm seed # re-seed after editing content/*.csv
+#   docker compose down -v       # wipe the database
+#
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: jale
+      POSTGRES_PASSWORD: jale
+      POSTGRES_DB: jale
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jale -d jale"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # One-shot: applies schema.sql, seeds content, generates placeholder audio,
+  # then exits. The api waits for it to finish successfully.
+  seed:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://jale:jale@db:5432/jale
+      RUN_MIGRATIONS: "true"
+      RUN_SEED: "true"
+      MIGRATE_ONLY: "true"
+      SEED_LANGUAGES: ibo
+      PLACEHOLDER_AUDIO: "true"
+      AUDIO_DIR: /srv/audio
+    volumes:
+      - audio:/srv/audio
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgresql://jale:jale@db:5432/jale
+      CORS_ORIGINS: http://localhost:5173,http://localhost:3000
+      PORT: "8000"
+      WEB_CONCURRENCY: "1"
+    ports:
+      - "8000:8000"
+    volumes:
+      # Live reload of application code without a rebuild.
+      - ./backend/app:/srv/app:ro
+      - ./content:/srv/content:ro
+      - audio:/srv/audio:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:
+  audio:

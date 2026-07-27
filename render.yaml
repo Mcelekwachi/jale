@@ -1,0 +1,44 @@
+# Render blueprint. Commit this and point Render at the repo — it provisions
+# the database and the API in one step. Railway equivalent is in README.md.
+#
+# The API pulls the image published by .github/workflows/release.yml rather
+# than building on Render, so what CI tested is exactly what ships.
+
+databases:
+  - name: jale-db
+    databaseName: jale
+    user: jale
+    plan: free                 # move to starter before real users arrive
+    postgresMajorVersion: "16"
+
+services:
+  - type: web
+    name: jale-api
+    runtime: image
+    plan: free
+    region: frankfurt          # closest to the Netherlands
+    image:
+      url: ghcr.io/CHANGE-ME/jale/api:latest
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: jale-db
+          property: connectionString
+      - key: DEFAULT_LANGUAGE
+        value: ibo
+      - key: CORS_ORIGINS
+        sync: false            # set to your Vercel URLs in the dashboard
+      - key: WEB_CONCURRENCY
+        value: "2"
+      # First deploy: set both to true so the container builds and seeds the
+      # database itself. They are idempotent and advisory-locked, so leaving
+      # them on is safe — turn them off once you move to real migrations.
+      - key: RUN_MIGRATIONS
+        value: "true"
+      - key: RUN_SEED
+        value: "true"
+      - key: SEED_LANGUAGES
+        value: ibo

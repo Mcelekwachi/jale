@@ -1,0 +1,54 @@
+# Jalɛ — Igbo language definition
+# Adding a new language = copying this file into content/<code>/ and editing it.
+
+language:
+  code: ibo                 # ISO 639-3
+  name: Igbo
+  endonym: Asụsụ Igbo
+  flag_emoji: "🇳🇬"
+  is_active: true
+  sort_order: 10
+
+dialects:
+  - code: central
+    name: Central Igbo
+    is_default: true
+  # Phase 2 candidates — rows only, no code change:
+  # - { code: owerri,  name: Owerri Igbo,  is_default: false }
+  # - { code: onitsha, name: Onitsha Igbo, is_default: false }
+  # - { code: aro,     name: Arochukwu Igbo, is_default: false }
+
+# Tone policy for this language (enforced as a warning by seed.py)
+tone_policy:
+  toned_content_types: [phrase, proverb]   # words stay plain for now
+  note: >
+    target_text_toned is populated per content item, never per lexeme.
+    Leave blank until a verified native contributor supplies the marking.
+
+categories:
+  # --- vocabulary & phrases -------------------------------------------
+  - { slug: greetings,      name: "Greetings & Courtesy",     icon: "wave",     sort_order: 10 }
+  - { slug: conversation,   name: "Everyday Conversation",    icon: "chat",     sort_order: 20 }
+  - { slug: family_people,  name: "Family & People",          icon: "family",   sort_order: 30 }
+  - { slug: body,           name: "The Body",                 icon: "body",     sort_order: 40 }
+  - { slug: numbers,        name: "Numbers",                  icon: "hash",     sort_order: 50 }
+  - { slug: time_days,      name: "Time & Days",              icon: "clock",    sort_order: 60 }
+  - { slug: food_market,    name: "Food & Drink",             icon: "bowl",     sort_order: 70 }
+  - { slug: places_travel,  name: "Places & Getting Around",  icon: "map",      sort_order: 80 }
+  - { slug: daily_life,     name: "Daily Life",               icon: "home",     sort_order: 90 }
+  - { slug: everyday_verbs, name: "Common Verbs & Commands",  icon: "bolt",     sort_order: 100 }
+  - { slug: question_words, name: "Question Words",           icon: "question", sort_order: 110 }
+  - { slug: animals,        name: "Animals",                  icon: "paw",      sort_order: 120 }
+  - { slug: health,         name: "Health",                   icon: "heart",    sort_order: 130 }
+  - { slug: shopping_money, name: "Shopping & Money",         icon: "coin",     sort_order: 140 }
+  - { slug: help_language,  name: "Asking for Help",          icon: "hand",     sort_order: 150 }
+  - { slug: feelings,       name: "Feelings & Affection",     icon: "spark",    sort_order: 160 }
+
+  # --- proverbs, themed so tracks can select by theme ------------------
+  - { slug: proverbs_unity,       name: "Unity & Community",       icon: "link",   sort_order: 200 }
+  - { slug: proverbs_character,   name: "Character & Reputation",  icon: "shield", sort_order: 210 }
+  - { slug: proverbs_work,        name: "Work & Patience",         icon: "tool",   sort_order: 220 }
+  - { slug: proverbs_family,      name: "Family & Elders",         icon: "tree",   sort_order: 230 }
+  - { slug: proverbs_speech,      name: "Speech & Truth",          icon: "quote",  sort_order: 240 }
+  - { slug: proverbs_destiny,     name: "Destiny & Origins",       icon: "star",   sort_order: 250 }
+  - { slug: proverbs_hospitality, name: "Hospitality & Custom",    icon: "kola",   sort_order: 260 }

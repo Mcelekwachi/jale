@@ -1,0 +1,140 @@
+# Jalɛ — Igbo curriculum tracks
+#
+# This file is the entire personalisation engine. track_resolver.py reads
+# user_preferences, walks rules in ascending priority, and returns the first
+# match. Null match fields are wildcards. No branching logic in application code.
+#
+# Units are QUERIES, not fixed item lists — new content flows into existing
+# tracks automatically.
+
+tracks:
+
+  # ---------------------------------------------------------------- native
+  - slug: ibo_native_advanced
+    name: "Ilu na Okwu Ọma — Proverbs & Formal Igbo"
+    description: >
+      For native speakers. No beginner vocabulary. Straight into proverbs,
+      cultural depth and formal register.
+    min_difficulty: advanced
+    max_difficulty: native
+    rules:
+      - { priority: 10, match_connection: [aboriginal_native] }
+      - { priority: 15, match_goal: [improve_proverbs_vocab] }
+    units:
+      - { position: 1, title: "Unity & Community",      mode: proverbs, category: proverbs_unity,       content_type: proverb, item_count: 7 }
+      - { position: 2, title: "Character & Reputation", mode: proverbs, category: proverbs_character,   content_type: proverb, item_count: 10 }
+      - { position: 3, title: "Work & Patience",        mode: proverbs, category: proverbs_work,        content_type: proverb, item_count: 10 }
+      - { position: 4, title: "Speech & Truth",         mode: proverbs, category: proverbs_speech,      content_type: proverb, item_count: 6 }
+      - { position: 5, title: "Family & Elders",        mode: proverbs, category: proverbs_family,      content_type: proverb, item_count: 6 }
+      - { position: 6, title: "Destiny & Origins",      mode: proverbs, category: proverbs_destiny,     content_type: proverb, item_count: 3 }
+      - { position: 7, title: "Hospitality & Custom",   mode: proverbs, category: proverbs_hospitality, content_type: proverb, item_count: 5 }
+      - { position: 8, title: "Formal Expression",      mode: phrase_practice, content_type: phrase, difficulty: intermediate, item_count: 10 }
+
+  # ----------------------------------------------------------------- child
+  - slug: ibo_child_play
+    name: "Mmụta site n'Egwuregwu — Learn by Play"
+    description: >
+      Under-13s. Short units, heavy repetition, picture-and-sound first,
+      every vocabulary unit immediately followed by its game.
+    min_difficulty: beginner
+    max_difficulty: beginner
+    rules:
+      - { priority: 20, match_age: [child_u13] }
+    units:
+      - { position: 1,  title: "Ekele — Saying Hello",  mode: flashcard, category: greetings,     content_type: word, item_count: 9 }
+      - { position: 2,  title: "Hello Game",            mode: quiz,      category: greetings,     content_type: word, item_count: 9 }
+      - { position: 3,  title: "Ọnụ Ọgụgụ — Numbers",   mode: flashcard, category: numbers,       content_type: word, item_count: 4 }
+      - { position: 4,  title: "Numbers Game",          mode: quiz,      category: numbers,       content_type: word, item_count: 4 }
+      - { position: 5,  title: "Ezinụlọ m — My Family", mode: flashcard, category: family_people, content_type: word, item_count: 7 }
+      - { position: 6,  title: "Family Game",           mode: quiz,      category: family_people, content_type: word, item_count: 7 }
+      - { position: 7,  title: "Ahụ m — My Body",       mode: flashcard, category: body,          content_type: word, item_count: 6 }
+      - { position: 8,  title: "Body Game",             mode: quiz,      category: body,          content_type: word, item_count: 6 }
+      - { position: 9,  title: "Anụmanụ — Animals",     mode: flashcard, category: animals,       content_type: word, item_count: 2 }
+      - { position: 10, title: "Nri na Mmiri",          mode: flashcard, category: food_market,   content_type: word, item_count: 3 }
+      - { position: 11, title: "Say It Out Loud",       mode: phrase_practice, category: greetings, content_type: phrase, item_count: 12 }
+
+  # ------------------------------------------------------- heritage speaker
+  - slug: ibo_heritage_structured
+    name: "Structure & Deep Context"
+    description: >
+      Grew up hearing Igbo, never learned it formally. Grammar structure and
+      reading comprehension from day one, proverbs with full cultural context.
+    min_difficulty: beginner
+    max_difficulty: native
+    rules:
+      - { priority: 30, match_connection: [igbo_heritage_speaker] }
+    units:
+      - { position: 1, title: "Sounds & Spelling Refresher", mode: flashcard,       category: greetings,     content_type: word,   item_count: 9 }
+      - { position: 2, title: "Core Vocabulary",             mode: flashcard,       category: family_people, content_type: word,   item_count: 7 }
+      - { position: 3, title: "Recall Drill",                mode: quiz,            content_type: word,      difficulty: beginner, item_count: 12 }
+      - { position: 4, title: "Everyday Exchanges",          mode: phrase_practice, category: conversation,  content_type: phrase, item_count: 12 }
+      - { position: 5, title: "Meaning & Comprehension",     mode: phrase_practice, category: help_language, content_type: phrase, item_count: 7 }
+      - { position: 6, title: "Proverbs: Character",         mode: proverbs,        category: proverbs_character, content_type: proverb, item_count: 10 }
+      - { position: 7, title: "Proverbs: Family & Elders",   mode: proverbs,        category: proverbs_family,    content_type: proverb, item_count: 6 }
+      - { position: 8, title: "Proverbs: Speech & Truth",    mode: proverbs,        category: proverbs_speech,    content_type: proverb, item_count: 6 }
+
+  # ------------------------------------------------- diaspora / mixed family
+  - slug: ibo_diaspora_culture
+    name: "Family, Story & Sound"
+    description: >
+      Igbo or mixed parents abroad, and people married into Igbo families.
+      Culture and family vocabulary first, audio-heavy, proverbs explained
+      in English with their cultural significance.
+    min_difficulty: beginner
+    max_difficulty: advanced
+    rules:
+      - { priority: 40, match_connection: [igbo_parent_abroad, mixed_parent_abroad, connected_to_igbo_family] }
+    units:
+      - { position: 1, title: "Family Words First",        mode: flashcard,       category: family_people, content_type: word,   item_count: 7 }
+      - { position: 2, title: "Greetings at Home",         mode: phrase_practice, category: greetings,     content_type: phrase, item_count: 12 }
+      - { position: 3, title: "Feelings & Affection",      mode: phrase_practice, category: feelings,      content_type: phrase, item_count: 3 }
+      - { position: 4, title: "Proverbs: Family & Elders", mode: proverbs,        category: proverbs_family, content_type: proverb, item_count: 6 }
+      - { position: 5, title: "Everyday Conversation",     mode: phrase_practice, category: conversation,  content_type: phrase, item_count: 12 }
+      - { position: 6, title: "Food & the Market",         mode: flashcard,       category: food_market,   content_type: word,   item_count: 3 }
+      - { position: 7, title: "Proverbs: Unity",           mode: proverbs,        category: proverbs_unity, content_type: proverb, item_count: 7 }
+      - { position: 8, title: "The Body",                  mode: flashcard,       category: body,          content_type: word,   item_count: 6 }
+      - { position: 9, title: "Recall Drill",              mode: quiz,            category: family_people, content_type: word,   item_count: 7 }
+
+  # -------------------------------------------------------------- enthusiast
+  - slug: ibo_enthusiast_discovery
+    name: "Wisdom First"
+    description: >
+      Language enthusiasts with no Igbo background. Opens with the most
+      interesting material — proverbs and cultural context — not word lists.
+    min_difficulty: beginner
+    max_difficulty: advanced
+    rules:
+      - { priority: 50, match_connection: [language_enthusiast] }
+    units:
+      - { position: 1, title: "Wisdom First",            mode: proverbs,        category: proverbs_unity,     content_type: proverb, item_count: 7 }
+      - { position: 2, title: "Greetings & Courtesy",    mode: flashcard,       category: greetings,          content_type: word,    item_count: 9 }
+      - { position: 3, title: "Proverbs: Speech & Truth",mode: proverbs,        category: proverbs_speech,    content_type: proverb, item_count: 6 }
+      - { position: 4, title: "Conversation Basics",     mode: phrase_practice, category: conversation,       content_type: phrase,  item_count: 12 }
+      - { position: 5, title: "Proverbs: Character",     mode: proverbs,        category: proverbs_character, content_type: proverb, item_count: 10 }
+      - { position: 6, title: "Daily Life Vocabulary",   mode: flashcard,       category: daily_life,         content_type: word,    item_count: 6 }
+      - { position: 7, title: "Time & Days",             mode: flashcard,       category: time_days,          content_type: word,    item_count: 7 }
+      - { position: 8, title: "Checkpoint Quiz",         mode: quiz,            category: greetings,          content_type: word,    item_count: 9 }
+
+  # ------------------------------------------------------------ default path
+  - slug: ibo_foundations
+    name: "Ntọala — Foundations"
+    description: >
+      Default track. Complete beginners and other African heritage learners.
+      Conventional build from greetings outward.
+    min_difficulty: beginner
+    max_difficulty: advanced
+    is_default: true
+    rules:
+      - { priority: 999 }          # wildcard — matches anyone unmatched above
+    units:
+      - { position: 1,  title: "Greetings & Courtesy",   mode: flashcard,       category: greetings,      content_type: word,   item_count: 9 }
+      - { position: 2,  title: "Greetings Quiz",         mode: quiz,            category: greetings,      content_type: word,   item_count: 9 }
+      - { position: 3,  title: "Your First Phrases",     mode: phrase_practice, category: greetings,      content_type: phrase, item_count: 12 }
+      - { position: 4,  title: "Family & People",        mode: flashcard,       category: family_people,  content_type: word,   item_count: 7 }
+      - { position: 5,  title: "Numbers",                mode: flashcard,       category: numbers,        content_type: word,   item_count: 4 }
+      - { position: 6,  title: "The Body",               mode: flashcard,       category: body,           content_type: word,   item_count: 6 }
+      - { position: 7,  title: "Everyday Conversation",  mode: phrase_practice, category: conversation,   content_type: phrase, item_count: 12 }
+      - { position: 8,  title: "Time & Days",            mode: flashcard,       category: time_days,      content_type: word,   item_count: 7 }
+      - { position: 9,  title: "Common Commands",        mode: phrase_practice, category: everyday_verbs, content_type: phrase, item_count: 9 }
+      - { position: 10, title: "Asking for Help",        mode: phrase_practice, category: help_language,  content_type: phrase, item_count: 7 }
+      - { position: 11, title: "Your First Proverbs",    mode: proverbs,        category: proverbs_unity, content_type: proverb, item_count: 7 }
