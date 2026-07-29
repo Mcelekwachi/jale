@@ -104,9 +104,7 @@ def main():
     ap.add_argument("--task", "-t", required=True, choices=sorted(QUERIES))
     ap.add_argument("--out", help="output path (default: worklists/<lang>_<task>_<date>.csv)")
     ap.add_argument("--database-url", default=os.environ.get("DATABASE_URL"))
-    ap.add_argument(
-        "--meta-language", default=os.environ.get("DEFAULT_META_LANGUAGE", "eng")
-    )
+    ap.add_argument("--meta-language", default=os.environ.get("DEFAULT_META_LANGUAGE", "eng"))
     args = ap.parse_args()
 
     if not args.database_url:

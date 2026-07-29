@@ -87,8 +87,7 @@ async def list_content(
 async def get_content(item_id: int) -> dict:
     settings = get_settings()
     row = await fetch_one(
-        _SELECT
-        + " WHERE c.id = %(id)s AND c.status = 'published' AND ml.code = %(meta_language)s",
+        _SELECT + " WHERE c.id = %(id)s AND c.status = 'published' AND ml.code = %(meta_language)s",
         {"id": item_id, "meta_language": settings.default_meta_language},
     )
     if row is None:
