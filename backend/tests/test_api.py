@@ -116,9 +116,7 @@ async def test_proverb_translation_requires_a_cultural_note(database_url):
                 """,
                 (unique_key, unique_key),
             ).fetchone()[0]
-            english_id = conn.execute(
-                "SELECT id FROM languages WHERE code = 'eng'"
-            ).fetchone()[0]
+            english_id = conn.execute("SELECT id FROM languages WHERE code = 'eng'").fetchone()[0]
 
             with pytest.raises(psycopg.errors.RaiseException, match=r"(?i)cultural.note"):
                 conn.execute(
@@ -141,10 +139,10 @@ async def test_open_flags_are_unique_per_item_and_translation_scope(database_url
                 "INSERT INTO app_users (id, email) VALUES (%s, %s)",
                 (user_id, f"{user_id}@example.test"),
             )
-            content_id = conn.execute("SELECT id FROM content_items ORDER BY id LIMIT 1").fetchone()[0]
-            english_id = conn.execute(
-                "SELECT id FROM languages WHERE code = 'eng'"
+            content_id = conn.execute(
+                "SELECT id FROM content_items ORDER BY id LIMIT 1"
             ).fetchone()[0]
+            english_id = conn.execute("SELECT id FROM languages WHERE code = 'eng'").fetchone()[0]
 
             conn.execute(
                 """

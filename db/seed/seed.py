@@ -201,8 +201,7 @@ def upsert_content(cur, language_id, dialect_id, cat_ids, rows, position_start=0
         )
         owner = cur.fetchone()
         if owner and (
-            owner["language_id"] != language_id
-            or owner["content_type"] != r["content_type"]
+            owner["language_id"] != language_id or owner["content_type"] != r["content_type"]
         ):
             raise SeedError(
                 f"source_key {r['source_key']!r} ownership mismatch: existing "
@@ -575,6 +574,7 @@ def prepare_language(code, file_codes):
         "tracks": tracks,
     }, []
 
+
 def write_language(conn, plan, meta_languages):
     spec, lang = plan["spec"], plan["lang"]
     categories, all_rows = plan["categories"], plan["all_rows"]
@@ -605,9 +605,7 @@ def write_language(conn, plan, meta_languages):
             (list(plan["source_keys"]),),
         )
         content_ids = {row["source_key"]: row["id"] for row in cur.fetchall()}
-        ins, upd = upsert_translations(
-            cur, content_ids, language_ids, plan["translations"]
-        )
+        ins, upd = upsert_translations(cur, content_ids, language_ids, plan["translations"])
         print(f"  translations: {ins} inserted, {upd} updated")
         upsert_tracks(cur, language_id, cat_ids, plan["tracks"])
         print(f"  tracks:  {len(plan['tracks'])} upserted")
