@@ -192,6 +192,26 @@ def upsert_content(cur, language_id, dialect_id, cat_ids, rows, position_start=0
     for offset, r in enumerate(rows):
         cur.execute(
             """
+            SELECT c.language_id, l.code AS language_code, c.content_type
+              FROM content_items c
+              JOIN languages l ON l.id = c.language_id
+             WHERE c.source_key = %s
+            """,
+            (r["source_key"],),
+        )
+        owner = cur.fetchone()
+        if owner and (
+            owner["language_id"] != language_id
+            or owner["content_type"] != r["content_type"]
+        ):
+            raise SeedError(
+                f"source_key {r['source_key']!r} ownership mismatch: existing "
+                f"language={owner['language_code']!r}, content_type="
+                f"{owner['content_type']!r}; incoming language_id={language_id}, "
+                f"content_type={r['content_type']!r}"
+            )
+        cur.execute(
+            """
             INSERT INTO content_items (
                 source_key, language_id, dialect_id, category_id,
                 content_type, difficulty_level,
@@ -217,6 +237,8 @@ def upsert_content(cur, language_id, dialect_id, cat_ids, rows, position_start=0
                                              content_items.audio_url),
                 audio_state       = GREATEST(EXCLUDED.audio_state,
                                              content_items.audio_state)
+            WHERE content_items.language_id = EXCLUDED.language_id
+              AND content_items.content_type = EXCLUDED.content_type
             RETURNING (xmax = 0) AS was_insert
             """,
             {
@@ -234,7 +256,13 @@ def upsert_content(cur, language_id, dialect_id, cat_ids, rows, position_start=0
                 "sort_order": position_start + offset,
             },
         )
-        if cur.fetchone()["was_insert"]:
+        result = cur.fetchone()
+        if result is None:
+            raise SeedError(
+                f"source_key {r['source_key']!r} ownership changed during upsert; "
+                "existing language/content_type was not modified"
+            )
+        if result["was_insert"]:
             inserted += 1
         else:
             updated += 1
