@@ -1,0 +1,14 @@
+languages:
+  - code: eng
+    name: English
+    is_meta: true
+    is_learnable: false
+    is_active: true
+    sort_order: 10
+
+  - code: nld
+    name: Dutch
+    is_meta: true
+    is_learnable: false
+    is_active: true
+    sort_order: 20
