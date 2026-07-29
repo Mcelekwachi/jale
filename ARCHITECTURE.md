@@ -91,12 +91,13 @@ model, serializer and React prop carries the word "igbo" — and adding Yoruba
 becomes a rename across the codebase. `target_text` + `language_id` keeps the
 promise. The UI still says "Igbo" because it reads `languages.name`.
 
-**b) Proverbs get three fields, not two.** `target_text`,
-`english_translation`, `cultural_note` — with a CHECK constraint that a proverb
-cannot be saved without its cultural lesson. `literal_translation` is optional
-and is where "Egbe bere ugo bere" becomes "let the kite perch, let the eagle
-perch" before you explain what it *means*. That literal layer is what native
-speakers judge you on.
+**b) Proverbs get three fields, not two.** `target_text` lives on
+`content_items`; `translation` and `cultural_note` live on the corresponding
+`content_translations` row for each meta-language. A database trigger prevents
+a proverb translation from being saved without its cultural lesson.
+`literal_translation` is optional and is where "Egbe bere ugo bere" becomes
+"let the kite perch, let the eagle perch" before you explain what it *means*.
+That literal layer is what native speakers judge you on.
 
 **c) Persona → curriculum is data (`tracks` / `track_rules` / `track_units`),
 not code.** Your five curriculum logic rules become five tracks and five rule
