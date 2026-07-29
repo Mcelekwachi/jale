@@ -1,5 +1,6 @@
 languages:
   - code: eng
+    file_code: en
     name: English
     is_meta: true
     is_learnable: false
@@ -7,6 +8,7 @@ languages:
     sort_order: 10
 
   - code: nld
+    file_code: nl
     name: Dutch
     is_meta: true
     is_learnable: false
