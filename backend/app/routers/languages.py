@@ -10,13 +10,16 @@ router = APIRouter(prefix="/v1/languages", tags=["languages"])
 
 @router.get("", response_model=list[Language])
 async def list_languages(include_inactive: bool = False) -> list[dict]:
-    """Active languages only by default. Phase 2 languages can sit in the
-    database as inactive rows long before they are ready to show."""
+    """Learnable target languages, active by default.
+
+    Inactive targets can sit in the database before launch; meta-only
+    languages are never part of the learner-facing language catalog.
+    """
     return await fetch_all(
         """
         SELECT code, name, endonym, flag_emoji, is_active
           FROM languages
-         WHERE (%(all)s OR is_active)
+         WHERE is_learnable AND (%(all)s OR is_active)
          ORDER BY sort_order, name
         """,
         {"all": include_inactive},
