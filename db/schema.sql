@@ -65,7 +65,7 @@ CREATE TABLE languages (
   name          TEXT NOT NULL,                 -- 'Igbo'
   endonym       TEXT,                          -- 'Asụsụ Igbo'
   flag_emoji    TEXT,
-  is_active     BOOLEAN NOT NULL DEFAULT FALSE,-- Phase 1: only Igbo is TRUE
+  is_active     BOOLEAN NOT NULL DEFAULT FALSE,-- available for use in the app
   is_learnable  BOOLEAN NOT NULL DEFAULT FALSE,
   is_meta       BOOLEAN NOT NULL DEFAULT FALSE,
   sort_order    SMALLINT NOT NULL DEFAULT 100,
@@ -338,7 +338,7 @@ CREATE TABLE content_flags (
   resolved_at     TIMESTAMPTZ,
   resolution_note TEXT
 );
--- one open flag per user per item — stops a single user inflating flag_count
+-- one open flag per user per item and meta-language scope
 CREATE UNIQUE INDEX one_open_flag_per_user
   ON content_flags (content_id, user_id, COALESCE(meta_language_id, 0))
   WHERE status IN ('open', 'in_review');
