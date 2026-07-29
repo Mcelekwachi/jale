@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import uuid
+
+import psycopg
 import pytest
 
 pytestmark = pytest.mark.asyncio
@@ -73,10 +76,101 @@ async def test_content_paging(client):
 
 async def test_search_matches_igbo_and_english(client):
     r = await client.get("/v1/content", params={"language": "ibo", "q": "mother"})
-    assert any(i["english_translation"].lower().startswith("mother") for i in r.json()["items"])
+    items = r.json()["items"]
+    assert any(i["translation"].lower().startswith("mother") for i in items)
+    assert all(i["meta_language"] == "eng" for i in items)
 
     r = await client.get("/v1/content", params={"language": "ibo", "q": "Ndewo"})
     assert r.json()["total"] >= 2  # exists as both a word and a phrase
+
+
+# --- database invariants ----------------------------------------------------
+
+
+async def test_seeded_translation_counts(database_url):
+    with psycopg.connect(database_url) as conn:
+        rows = conn.execute(
+            """
+            SELECT l.code, count(ct.content_id)
+              FROM languages l
+              LEFT JOIN content_translations ct ON ct.meta_language_id = l.id
+             WHERE l.code IN ('eng', 'nld')
+             GROUP BY l.code
+            """
+        ).fetchall()
+
+    assert dict(rows) == {"eng": 157, "nld": 0}
+
+
+async def test_proverb_translation_requires_a_cultural_note(database_url):
+    unique_key = f"test:proverb:{uuid.uuid4()}"
+    with psycopg.connect(database_url) as conn:
+        try:
+            content_id = conn.execute(
+                """
+                INSERT INTO content_items (source_key, language_id, content_type, target_text)
+                SELECT %s, id, 'proverb', %s
+                  FROM languages
+                 WHERE code = 'ibo'
+                RETURNING id
+                """,
+                (unique_key, unique_key),
+            ).fetchone()[0]
+            english_id = conn.execute(
+                "SELECT id FROM languages WHERE code = 'eng'"
+            ).fetchone()[0]
+
+            with pytest.raises(psycopg.errors.RaiseException, match=r"(?i)cultural.note"):
+                conn.execute(
+                    """
+                    INSERT INTO content_translations
+                        (content_id, meta_language_id, translation, cultural_note)
+                    VALUES (%s, %s, %s, NULL)
+                    """,
+                    (content_id, english_id, "Test translation"),
+                )
+        finally:
+            conn.rollback()
+
+
+async def test_open_flags_are_unique_per_item_and_translation_scope(database_url):
+    user_id = uuid.uuid4()
+    with psycopg.connect(database_url) as conn:
+        try:
+            conn.execute(
+                "INSERT INTO app_users (id, email) VALUES (%s, %s)",
+                (user_id, f"{user_id}@example.test"),
+            )
+            content_id = conn.execute("SELECT id FROM content_items ORDER BY id LIMIT 1").fetchone()[0]
+            english_id = conn.execute(
+                "SELECT id FROM languages WHERE code = 'eng'"
+            ).fetchone()[0]
+
+            conn.execute(
+                """
+                INSERT INTO content_flags (content_id, user_id, meta_language_id, reason)
+                VALUES (%s, %s, NULL, 'other'), (%s, %s, %s, 'wrong_translation')
+                """,
+                (content_id, user_id, content_id, user_id, english_id),
+            )
+            count = conn.execute(
+                "SELECT count(*) FROM content_flags WHERE content_id = %s AND user_id = %s",
+                (content_id, user_id),
+            ).fetchone()[0]
+            assert count == 2
+
+            for meta_language_id in (None, english_id):
+                with pytest.raises(psycopg.errors.UniqueViolation), conn.transaction():
+                    conn.execute(
+                        """
+                        INSERT INTO content_flags
+                            (content_id, user_id, meta_language_id, reason)
+                        VALUES (%s, %s, %s, 'other')
+                        """,
+                        (content_id, user_id, meta_language_id),
+                    )
+        finally:
+            conn.rollback()
 
 
 async def test_duplicate_text_across_content_types_is_preserved(client):
