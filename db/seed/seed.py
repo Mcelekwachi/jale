@@ -453,6 +453,7 @@ def prepare_language(code, file_codes):
                 source_types[key] = content_type
 
     translations = []
+    english_proverb_rows = set()
     translation_dir = lang_dir / "translations"
     paths = sorted(translation_dir.glob("*.csv")) if translation_dir.is_dir() else []
     for path in paths:
@@ -478,6 +479,7 @@ def prepare_language(code, file_codes):
             translation = nullify(row.get("translation"))
             cultural_note = nullify(row.get("cultural_note"))
             if meta_code == "eng" and source_types.get(key) == "proverb":
+                english_proverb_rows.add(key)
                 if not translation:
                     errors.append(f"{loc}: proverb {key!r} missing translation")
                 if not cultural_note:
@@ -493,16 +495,13 @@ def prepare_language(code, file_codes):
                     }
                 )
 
-    english_keys = {
-        row["source_key"] for row in translations if row["meta_code"] == "eng"
-    }
     english_file_code = next(
         (file_code for file_code, meta_code in file_codes.items() if meta_code == "eng"),
         "eng",
     )
     english_path = translation_dir / f"{english_file_code}.csv"
     for key, content_type in source_types.items():
-        if content_type == "proverb" and key not in english_keys:
+        if content_type == "proverb" and key not in english_proverb_rows:
             errors.append(f"{english_path}: proverb {key!r} missing translation")
             errors.append(f"{english_path}: proverb {key!r} missing cultural_note")
 
