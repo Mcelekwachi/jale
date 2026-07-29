@@ -42,6 +42,7 @@ TARGET_HEADERS = {
     "source_key",
     "content_type",
     "target_text",
+    "target_text_toned",
     "category_slug",
     "difficulty",
 }
@@ -495,9 +496,15 @@ def prepare_language(code, file_codes):
     english_keys = {
         row["source_key"] for row in translations if row["meta_code"] == "eng"
     }
+    english_file_code = next(
+        (file_code for file_code, meta_code in file_codes.items() if meta_code == "eng"),
+        "eng",
+    )
+    english_path = translation_dir / f"{english_file_code}.csv"
     for key, content_type in source_types.items():
         if content_type == "proverb" and key not in english_keys:
-            errors.append(f"{translation_dir / 'en.csv'}: missing proverb {key!r}")
+            errors.append(f"{english_path}: proverb {key!r} missing translation")
+            errors.append(f"{english_path}: proverb {key!r} missing cultural_note")
 
     tracks_path = lang_dir / "tracks.yaml"
     tracks_document = yaml.safe_load(tracks_path.read_text(encoding="utf-8")) or {}
