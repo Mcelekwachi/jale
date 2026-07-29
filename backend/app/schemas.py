@@ -92,7 +92,8 @@ class ContentItem(BaseModel):
 
     target_text: str
     target_text_toned: str | None = None
-    english_translation: str
+    translation: str
+    meta_language: str
     literal_translation: str | None = None
     cultural_note: str | None = None
     example_sentence: str | None = None
@@ -156,6 +157,7 @@ class StudyItem(BaseModel):
     content_type: ContentType
     prompt: str
     answer: str
+    meta_language: str
     audio_url: str | None = None
     audio_state: str
 

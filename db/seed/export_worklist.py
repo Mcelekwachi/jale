@@ -33,11 +33,14 @@ QUERIES = {
     # items inside the language's tone policy that nobody has marked yet
     "tone": """
         SELECT c.source_key, c.content_type, cat.slug AS category,
-               c.target_text, c.target_text_toned, c.english_translation
+               c.target_text, c.target_text_toned, ct.translation
           FROM content_items c
           JOIN languages l ON l.id = c.language_id
+          JOIN content_translations ct ON ct.content_id = c.id
+          JOIN languages ml ON ml.id = ct.meta_language_id
      LEFT JOIN categories cat ON cat.id = c.category_id
          WHERE l.code = %(code)s
+           AND ml.code = %(meta_language)s
            AND c.content_type IN ('phrase', 'proverb')
            AND c.target_text_toned IS NULL
            AND c.status = 'published'
@@ -46,12 +49,15 @@ QUERIES = {
     # every item that has no real recording yet
     "audio": """
         SELECT c.source_key, c.content_type, cat.slug AS category,
-               c.target_text, c.english_translation,
+               c.target_text, ct.translation,
                c.audio_state, c.audio_url
           FROM content_items c
           JOIN languages l ON l.id = c.language_id
+          JOIN content_translations ct ON ct.content_id = c.id
+          JOIN languages ml ON ml.id = ct.meta_language_id
      LEFT JOIN categories cat ON cat.id = c.category_id
          WHERE l.code = %(code)s
+           AND ml.code = %(meta_language)s
            AND c.audio_state <> 'verified'
            AND c.status = 'published'
       ORDER BY c.content_type, c.sort_order
@@ -59,22 +65,35 @@ QUERIES = {
     # translations and cultural notes awaiting a native speaker's sign-off
     "verify": """
         SELECT c.source_key, c.content_type, c.target_text,
-               c.english_translation, c.literal_translation, c.cultural_note
+               ct.translation, ct.literal_translation, ct.cultural_note, ct.verified
           FROM content_items c
           JOIN languages l ON l.id = c.language_id
+          JOIN content_translations ct ON ct.content_id = c.id
+          JOIN languages ml ON ml.id = ct.meta_language_id
          WHERE l.code = %(code)s
-           AND c.verified = FALSE
+           AND ml.code = %(meta_language)s
+           AND ct.verified = FALSE
            AND c.status = 'published'
       ORDER BY c.content_type, c.sort_order
     """,
     # what users have reported, worst first
     "flagged": """
-        SELECT q.content_id, q.content_type, q.target_text,
-               q.english_translation, q.flag_count, q.oldest_flag_at,
-               array_to_string(q.reasons, '; ') AS reasons
-          FROM admin_flag_queue q
-          JOIN languages l ON l.name = q.language
+        SELECT c.id AS content_id, c.content_type, c.target_text,
+               ml.code AS meta_language, ct.translation, ct.literal_translation,
+               ct.cultural_note, ct.verified, count(*)::int AS flag_count,
+               min(f.created_at) AS oldest_flag_at,
+               array_to_string(array_agg(DISTINCT f.reason), '; ') AS reasons
+          FROM content_flags f
+          JOIN content_items c ON c.id = f.content_id
+          JOIN languages l ON l.id = c.language_id
+     LEFT JOIN languages ml ON ml.id = f.meta_language_id
+     LEFT JOIN content_translations ct
+            ON ct.content_id = c.id AND ct.meta_language_id = f.meta_language_id
          WHERE l.code = %(code)s
+           AND f.status IN ('open', 'in_review')
+      GROUP BY c.id, c.content_type, c.target_text, ml.code, ct.translation,
+               ct.literal_translation, ct.cultural_note, ct.verified
+      ORDER BY flag_count DESC, oldest_flag_at ASC
     """,
 }
 
@@ -85,13 +104,19 @@ def main():
     ap.add_argument("--task", "-t", required=True, choices=sorted(QUERIES))
     ap.add_argument("--out", help="output path (default: worklists/<lang>_<task>_<date>.csv)")
     ap.add_argument("--database-url", default=os.environ.get("DATABASE_URL"))
+    ap.add_argument(
+        "--meta-language", default=os.environ.get("DEFAULT_META_LANGUAGE", "eng")
+    )
     args = ap.parse_args()
 
     if not args.database_url:
         ap.error("set DATABASE_URL or pass --database-url")
 
     with psycopg.connect(args.database_url) as conn, conn.cursor(row_factory=dict_row) as cur:
-        cur.execute(QUERIES[args.task], {"code": args.language})
+        cur.execute(
+            QUERIES[args.task],
+            {"code": args.language, "meta_language": args.meta_language},
+        )
         rows = cur.fetchall()
 
     if not rows:

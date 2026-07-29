@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import random
 
+from app.config import get_settings
 from app.db import fetch_all, fetch_one
 
 _UNIT_SQL = """
@@ -31,12 +32,15 @@ SELECT u.position, u.title, u.mode, u.item_count,
 
 _ITEMS_SQL = """
 SELECT c.id, c.content_type, c.difficulty_level, c.category_id,
-       c.target_text, c.target_text_toned, c.english_translation,
-       c.literal_translation, c.cultural_note,
+       c.target_text, c.target_text_toned, ct.translation,
+       ml.code AS meta_language, ct.literal_translation, ct.cultural_note,
        c.example_sentence, c.example_translation,
        c.audio_url, c.audio_state, c.verified, c.flag_count
   FROM content_items c
+  JOIN content_translations ct ON ct.content_id = c.id
+  JOIN languages ml ON ml.id = ct.meta_language_id
  WHERE c.language_id = %(language_id)s
+   AND ml.code = %(meta_language)s
    AND c.status = 'published'
    AND (%(category_id)s::smallint    IS NULL OR c.category_id      = %(category_id)s)
    AND (%(content_type)s::content_type IS NULL OR c.content_type   = %(content_type)s)
@@ -70,6 +74,7 @@ def _shape(row: dict, mode: str, options: list[dict] | None = None) -> dict:
     base = {
         "id": row["id"],
         "content_type": row["content_type"],
+        "meta_language": row["meta_language"],
         "audio_url": row["audio_url"],
         "audio_state": row["audio_state"],
         "verified": row["verified"],
@@ -85,13 +90,13 @@ def _shape(row: dict, mode: str, options: list[dict] | None = None) -> dict:
     if mode == "quiz":
         # Prompt in English, answer in the target language: recall, not recognition.
         base |= {
-            "prompt": row["english_translation"],
+            "prompt": row["translation"],
             "answer": row["target_text"],
             "options": options,
         }
         return base
 
-    base |= {"prompt": row["target_text"], "answer": row["english_translation"]}
+    base |= {"prompt": row["target_text"], "answer": row["translation"]}
 
     if mode == "phrase_practice":
         base |= {
@@ -120,6 +125,7 @@ async def build_session(
         _ITEMS_SQL,
         {
             "language_id": unit["language_id"],
+            "meta_language": get_settings().default_meta_language,
             "category_id": unit["filter_category_id"],
             "content_type": unit["filter_content_type"],
             "difficulty": unit["filter_difficulty"],

@@ -12,6 +12,7 @@ class Settings:
         self.env: str = os.getenv("APP_ENV", "development")
         self.database_url: str = os.getenv("DATABASE_URL", "")
         self.default_language: str = os.getenv("DEFAULT_LANGUAGE", "ibo")
+        self.default_meta_language: str = os.getenv("DEFAULT_META_LANGUAGE", "eng")
 
         # Vercel preview deployments get their own URL per branch, so the
         # frontend origin list has to be configurable rather than hardcoded.
