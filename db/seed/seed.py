@@ -400,6 +400,9 @@ def read_csv(path, required_headers, errors):
 def load_meta_languages(errors):
     path = CONTENT_ROOT / "meta_languages.yaml"
     document = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    if not isinstance(document, dict):
+        errors.append(f"{path}: YAML root must be a mapping")
+        return [], {}
     languages = document.get("languages")
     if not isinstance(languages, list):
         errors.append(f"{path}: top-level 'languages' must be a list")
@@ -407,6 +410,9 @@ def load_meta_languages(errors):
     file_codes, codes = {}, set()
     for index, lang in enumerate(languages, start=1):
         loc = f"{path}:languages[{index}]"
+        if not isinstance(lang, dict):
+            errors.append(f"{loc}: language entry must be a mapping")
+            continue
         for field in ("code", "name", "file_code"):
             if not lang.get(field):
                 errors.append(f"{loc}: missing {field}")
@@ -531,6 +537,7 @@ def prepare_language(code, file_codes):
         return None, errors
     return {
         "spec": spec,
+        "code": code,
         "lang": lang,
         "categories": categories,
         "all_rows": all_rows,
@@ -577,7 +584,6 @@ def write_language(conn, plan, meta_languages):
         upsert_tracks(cur, language_id, cat_ids, plan["tracks"])
         print(f"  tracks:  {len(plan['tracks'])} upserted")
         report_coverage(cur, language_id)
-    conn.commit()
 
 
 def main():
@@ -614,6 +620,17 @@ def main():
                 plans.append(plan)
         except (OSError, KeyError, TypeError, yaml.YAMLError, SeedError) as exc:
             errors.append(f"{CONTENT_ROOT / code}: {exc}")
+    source_key_owners = {}
+    for plan in plans:
+        for source_key in plan["source_keys"]:
+            owner = source_key_owners.get(source_key)
+            if owner is not None:
+                errors.append(
+                    f"content/{plan['code']}: source_key {source_key!r} collides with "
+                    f"content/{owner}; source_key must be globally unique"
+                )
+            else:
+                source_key_owners[source_key] = plan["code"]
     if errors:
         for error in errors:
             print(f"  ERROR {error}", file=sys.stderr)
@@ -631,11 +648,15 @@ def main():
     try:
         for plan in plans:
             write_language(conn, plan, meta_languages)
+        conn.commit()
     except SeedError as exc:
         print(f"\nseed failed: {exc}", file=sys.stderr)
         if conn:
             conn.rollback()
         sys.exit(1)
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         if conn:
             conn.close()
