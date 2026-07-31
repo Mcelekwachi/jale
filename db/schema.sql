@@ -369,7 +369,8 @@ CREATE TRIGGER content_translations_touch BEFORE UPDATE ON content_translations
 CREATE TRIGGER user_preferences_touch BEFORE UPDATE ON user_preferences
   FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 
--- A proverb translation is incomplete without the cultural lesson it conveys.
+-- The seeded English/default proverb translation must carry its cultural lesson;
+-- other meta languages may fall back to that lesson independently.
 CREATE OR REPLACE FUNCTION require_proverb_translation_cultural_note()
 RETURNS TRIGGER AS $$
 DECLARE
