@@ -34,10 +34,15 @@ async def list_meta_languages() -> list[dict]:
                coverage.translated_count, coverage.total_count
           FROM languages l
          CROSS JOIN LATERAL (
-               SELECT count(*) FILTER (WHERE ct.content_id IS NOT NULL)::int
+               SELECT count(*) FILTER (
+                          WHERE ct.content_id IS NOT NULL
+                            AND NULLIF(btrim(ct.translation), '') IS NOT NULL
+                      )::int
                           AS translated_count,
                       count(*)::int AS total_count
                  FROM content_items c
+                 JOIN languages owner ON owner.id = c.language_id
+                                     AND owner.is_learnable
                  LEFT JOIN content_translations ct
                         ON ct.content_id = c.id
                        AND ct.meta_language_id = l.id
