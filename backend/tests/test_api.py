@@ -347,6 +347,88 @@ async def test_meta_language_coverage_counts_only_published_content(client, data
             )
 
 
+async def test_meta_language_coverage_ignores_empty_translation_rows(client, database_url):
+    untranslated = select_content_row(
+        database_url,
+        "NOT EXISTS ("
+        "SELECT 1 FROM content_translations nld_ct "
+        "JOIN languages nld ON nld.id = nld_ct.meta_language_id "
+        "WHERE nld_ct.content_id = c.id AND nld.code = 'nld'"
+        ")",
+    )
+    baseline_response = await client.get("/v1/languages/meta")
+    assert baseline_response.status_code == 200
+    baseline = next(row for row in baseline_response.json() if row["code"] == "nld")
+
+    with psycopg.connect(database_url, autocommit=True) as conn:
+        dutch_id = conn.execute("SELECT id FROM languages WHERE code = 'nld'").fetchone()[0]
+        try:
+            conn.execute(
+                """
+                INSERT INTO content_translations
+                    (content_id, meta_language_id, translation)
+                VALUES (%s, %s, '')
+                """,
+                (untranslated[0], dutch_id),
+            )
+
+            response = await client.get("/v1/languages/meta")
+            assert response.status_code == 200
+            dutch = next(row for row in response.json() if row["code"] == "nld")
+            assert dutch["translated_count"] == baseline["translated_count"]
+            assert dutch["total_count"] == baseline["total_count"]
+        finally:
+            conn.execute(
+                """
+                DELETE FROM content_translations
+                 WHERE content_id = %s AND meta_language_id = %s
+                """,
+                (untranslated[0], dutch_id),
+            )
+
+
+async def test_meta_language_coverage_excludes_meta_only_target_content(client, database_url):
+    unique_key = f"test:meta-target:{uuid.uuid4()}"
+    baseline_response = await client.get("/v1/languages/meta")
+    assert baseline_response.status_code == 200
+    baseline = next(row for row in baseline_response.json() if row["code"] == "eng")
+
+    with psycopg.connect(database_url, autocommit=True) as conn:
+        english = conn.execute(
+            "SELECT id, is_learnable, is_meta FROM languages WHERE code = 'eng'"
+        ).fetchone()
+        assert english[1:] == (False, True)
+        english_id = english[0]
+        content_id = None
+        try:
+            content_id = conn.execute(
+                """
+                INSERT INTO content_items
+                    (source_key, language_id, content_type, target_text, status)
+                VALUES (%s, %s, 'word', %s, 'published')
+                RETURNING id
+                """,
+                (unique_key, english_id, unique_key),
+            ).fetchone()[0]
+            conn.execute(
+                """
+                INSERT INTO content_translations
+                    (content_id, meta_language_id, translation)
+                VALUES (%s, %s, 'Temporary English translation')
+                """,
+                (content_id, english_id),
+            )
+
+            response = await client.get("/v1/languages/meta")
+            assert response.status_code == 200
+            english = next(row for row in response.json() if row["code"] == "eng")
+            assert english["translated_count"] == baseline["translated_count"]
+            assert english["total_count"] == baseline["total_count"]
+        finally:
+            if content_id is not None:
+                conn.execute("DELETE FROM content_items WHERE id = %s", (content_id,))
+
+
 async def test_english_proverb_translation_requires_a_cultural_note(database_url):
     unique_key = f"test:proverb:{uuid.uuid4()}"
     with psycopg.connect(database_url) as conn:
