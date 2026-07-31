@@ -50,7 +50,7 @@ SELECT c.id, c.content_type, c.difficulty_level, c.category_id,
 
 # A single pool query supplies answer candidates for either study direction.
 _DISTRACTOR_SQL = """
-SELECT c.target_text,
+SELECT c.content_type, c.category_id, c.target_text,
        requested_ct.translation AS requested_translation,
        default_ct.translation AS default_translation
   FROM content_items c
@@ -65,8 +65,7 @@ SELECT c.target_text,
  WHERE c.language_id = %(language_id)s
    AND c.status = 'published'
    AND c.id <> ALL(%(exclude_ids)s)
-   AND c.content_type = %(content_type)s
- ORDER BY (c.category_id IS DISTINCT FROM %(category_id)s), random()
+ ORDER BY c.sort_order, c.id
 """
 
 
@@ -116,8 +115,32 @@ def _shape(
     return base
 
 
-def _unique_wrong_answers(values: list[str | None], answer: str) -> list[str]:
-    return list(dict.fromkeys(value for value in values if value and value != answer))
+def _pick_wrong_answers(
+    pool: list[dict],
+    row: dict,
+    field: str,
+    answer: str,
+    rng: random.Random,
+) -> list[str]:
+    """Prefer the question's category, then widen within its content type."""
+    seen = {answer}
+    same_category: list[str] = []
+    other_categories: list[str] = []
+    for candidate in pool:
+        value = candidate[field]
+        if candidate["content_type"] != row["content_type"] or not value or value in seen:
+            continue
+        seen.add(value)
+        destination = (
+            same_category if candidate["category_id"] == row["category_id"] else other_categories
+        )
+        destination.append(value)
+
+    picked = rng.sample(same_category, k=min(3, len(same_category)))
+    remaining = 3 - len(picked)
+    if remaining:
+        picked += rng.sample(other_categories, k=min(remaining, len(other_categories)))
+    return picked
 
 
 async def build_session(
@@ -159,23 +182,20 @@ async def build_session(
                 "meta_language": meta_language,
                 "default_meta_language": default_meta_language,
                 "exclude_ids": ids,
-                "content_type": rows[0]["content_type"],
-                "category_id": unit["filter_category_id"],
             },
         )
         rng = random.Random(shuffle_seed)
         for row in rows:
             if direction == StudyDirection.meta_to_target:
-                candidates = [candidate["target_text"] for candidate in pool]
+                field = "target_text"
                 answer = row["target_text"]
             elif row["meta_language_used"] == meta_language:
-                candidates = [candidate["requested_translation"] for candidate in pool]
+                field = "requested_translation"
                 answer = row["translation"]
             else:
-                candidates = [candidate["default_translation"] for candidate in pool]
+                field = "default_translation"
                 answer = row["translation"]
-            wrong = _unique_wrong_answers(candidates, answer)
-            picked = rng.sample(wrong, k=min(3, len(wrong)))
+            picked = _pick_wrong_answers(pool, row, field, answer, rng)
             options = [{"text": answer, "is_correct": True}]
             options += [{"text": text, "is_correct": False} for text in picked]
             rng.shuffle(options)
