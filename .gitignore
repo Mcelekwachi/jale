@@ -10,3 +10,4 @@ dist/
 worklists/
 frontend/public/audio/
 .worktrees/
+uv.lock
