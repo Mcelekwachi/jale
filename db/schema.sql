@@ -372,13 +372,21 @@ CREATE TRIGGER user_preferences_touch BEFORE UPDATE ON user_preferences
 -- A proverb translation is incomplete without the cultural lesson it conveys.
 CREATE OR REPLACE FUNCTION require_proverb_translation_cultural_note()
 RETURNS TRIGGER AS $$
-DECLARE parent_type content_type;
+DECLARE
+  parent_type content_type;
+  translation_language CHAR(3);
 BEGIN
   SELECT content_type INTO parent_type
     FROM content_items
    WHERE id = NEW.content_id;
 
-  IF parent_type = 'proverb' AND NEW.cultural_note IS NULL THEN
+  SELECT code INTO translation_language
+    FROM languages
+   WHERE id = NEW.meta_language_id;
+
+  IF parent_type = 'proverb'
+     AND translation_language = 'eng'
+     AND NEW.cultural_note IS NULL THEN
     RAISE EXCEPTION 'cultural_note is required for proverb translations';
   END IF;
 

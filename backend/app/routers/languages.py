@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 
 from app.db import fetch_all, fetch_one
-from app.schemas import Category, Language
+from app.schemas import Category, Language, MetaLanguageCoverage
 
 router = APIRouter(prefix="/v1/languages", tags=["languages"])
 
@@ -23,6 +23,26 @@ async def list_languages(include_inactive: bool = False) -> list[dict]:
          ORDER BY sort_order, name
         """,
         {"all": include_inactive},
+    )
+
+
+@router.get("/meta", response_model=list[MetaLanguageCoverage])
+async def list_meta_languages() -> list[dict]:
+    return await fetch_all(
+        """
+        SELECT l.code, l.name, l.endonym, l.flag_emoji, l.is_active,
+               (SELECT count(*)::int
+                  FROM content_translations ct
+                  JOIN content_items c ON c.id = ct.content_id
+                 WHERE ct.meta_language_id = l.id
+                   AND c.status = 'published') AS translated_count,
+               (SELECT count(*)::int
+                  FROM content_items c
+                 WHERE c.status = 'published') AS total_count
+          FROM languages l
+         WHERE l.is_meta AND l.is_active
+         ORDER BY l.sort_order, l.name
+        """
     )
 
 
