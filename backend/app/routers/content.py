@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Query
 from app.config import get_settings
 from app.db import fetch_all, fetch_one
 from app.schemas import ContentItem, ContentPage, ContentType, Difficulty
-from app.services.meta_languages import validate_meta_language
+from app.services.meta_languages import resolve_meta_languages
 
 router = APIRouter(prefix="/v1/content", tags=["content"])
 
@@ -65,12 +65,13 @@ async def list_content(
 ) -> dict:
     settings = get_settings()
     limit = min(limit, settings.max_page_size)
+    requested_meta_language, default_meta_language = await resolve_meta_languages(
+        meta_language, settings.default_meta_language
+    )
     params = {
         "language": language or settings.default_language,
-        "meta_language": await validate_meta_language(
-            meta_language or settings.default_meta_language
-        ),
-        "default_meta_language": settings.default_meta_language,
+        "meta_language": requested_meta_language,
+        "default_meta_language": default_meta_language,
         "content_type": content_type.value if content_type else None,
         "difficulty": difficulty.value if difficulty else None,
         "category": category,
@@ -107,15 +108,15 @@ async def list_content(
 @router.get("/{item_id}", response_model=ContentItem)
 async def get_content(item_id: int, meta_language: str | None = None) -> dict:
     settings = get_settings()
-    requested_meta_language = await validate_meta_language(
-        meta_language or settings.default_meta_language
+    requested_meta_language, default_meta_language = await resolve_meta_languages(
+        meta_language, settings.default_meta_language
     )
     row = await fetch_one(
         _SELECT + " WHERE c.id = %(id)s AND c.status = 'published'",
         {
             "id": item_id,
             "meta_language": requested_meta_language,
-            "default_meta_language": settings.default_meta_language,
+            "default_meta_language": default_meta_language,
         },
     )
     if row is None:

@@ -75,6 +75,7 @@ def _shape(row: dict, mode: str, options: list[dict] | None = None) -> dict:
         "id": row["id"],
         "content_type": row["content_type"],
         "meta_language": row["meta_language"],
+        "meta_language_used": row["meta_language"],
         "audio_url": row["audio_url"],
         "audio_state": row["audio_state"],
         "verified": row["verified"],

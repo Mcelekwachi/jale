@@ -31,16 +31,19 @@ async def list_meta_languages() -> list[dict]:
     return await fetch_all(
         """
         SELECT l.code, l.name, l.endonym, l.flag_emoji, l.is_active,
-               count(*) FILTER (WHERE ct.content_id IS NOT NULL)::int
-                   AS translated_count,
-               count(*)::int AS total_count
+               coverage.translated_count, coverage.total_count
           FROM languages l
-         CROSS JOIN content_items c
-          LEFT JOIN content_translations ct
-                 ON ct.content_id = c.id AND ct.meta_language_id = l.id
+         CROSS JOIN LATERAL (
+               SELECT count(*) FILTER (WHERE ct.content_id IS NOT NULL)::int
+                          AS translated_count,
+                      count(*)::int AS total_count
+                 FROM content_items c
+                 LEFT JOIN content_translations ct
+                        ON ct.content_id = c.id
+                       AND ct.meta_language_id = l.id
+                WHERE c.status = 'published'
+         ) coverage
          WHERE l.is_meta AND l.is_active
-           AND c.status = 'published'
-         GROUP BY l.id
          ORDER BY l.sort_order, l.name
         """
     )
