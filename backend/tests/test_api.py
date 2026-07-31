@@ -46,7 +46,7 @@ def committed_dutch_translations(
             )
 
 
-def content_row(database_url: str, where: str = "TRUE") -> tuple:
+def content_rows(database_url: str, where: str = "TRUE", limit: int = 1) -> list[tuple]:
     with psycopg.connect(database_url) as conn:
         return conn.execute(
             f"""  # noqa: S608 - the predicate is test-owned, never user input
@@ -57,9 +57,14 @@ def content_row(database_url: str, where: str = "TRUE") -> tuple:
               JOIN languages ml ON ml.id = ct.meta_language_id AND ml.code = 'eng'
              WHERE c.status = 'published' AND {where}
              ORDER BY c.sort_order, c.id
-             LIMIT 1
-            """
-        ).fetchone()
+             LIMIT %s
+            """,
+            (limit,),
+        ).fetchall()
+
+
+def content_row(database_url: str, where: str = "TRUE") -> tuple:
+    return content_rows(database_url, where)[0]
 
 
 # --- health -----------------------------------------------------------------
@@ -200,23 +205,45 @@ async def test_one_dutch_translation_produces_a_mixed_page(client, database_url)
         )
 
 
-async def test_requested_translation_inherits_each_null_optional_field(client, database_url):
-    proverb = content_row(
+async def test_requested_translation_falls_back_each_optional_field_independently(
+    client, database_url
+):
+    proverbs = content_rows(
         database_url,
         "c.content_type = 'proverb' AND ct.literal_translation IS NOT NULL "
         "AND ct.cultural_note IS NOT NULL",
+        limit=2,
     )
+    dutch_literal = "Nederlandse letterlijke vertaling"
+    dutch_cultural = "Nederlandse culturele uitleg"
     with committed_dutch_translations(
-        database_url, [(proverb[0], "Nederlands spreekwoord", None, None)]
+        database_url,
+        [
+            (proverbs[0][0], "Nederlands spreekwoord één", dutch_literal, None),
+            (proverbs[1][0], "Nederlands spreekwoord twee", None, dutch_cultural),
+        ],
     ):
-        r = await client.get(f"/v1/content/{proverb[0]}", params={"meta_language": "nld"})
-        assert r.status_code == 200
-        item = r.json()
-        assert item["translation"] == "Nederlands spreekwoord"
-        assert item["meta_language"] == "nld"
-        assert item["meta_language_used"] == "nld"
-        assert item["literal_translation"] == proverb[3]
-        assert item["cultural_note"] == proverb[4]
+        literal_authored = await client.get(
+            f"/v1/content/{proverbs[0][0]}", params={"meta_language": "nld"}
+        )
+        cultural_authored = await client.get(
+            f"/v1/content/{proverbs[1][0]}", params={"meta_language": "nld"}
+        )
+        assert literal_authored.status_code == cultural_authored.status_code == 200
+
+        literal_item = literal_authored.json()
+        assert literal_item["translation"] == "Nederlands spreekwoord één"
+        assert literal_item["meta_language"] == "nld"
+        assert literal_item["meta_language_used"] == "nld"
+        assert literal_item["literal_translation"] == dutch_literal
+        assert literal_item["cultural_note"] == proverbs[0][4]
+
+        cultural_item = cultural_authored.json()
+        assert cultural_item["translation"] == "Nederlands spreekwoord twee"
+        assert cultural_item["meta_language"] == "nld"
+        assert cultural_item["meta_language_used"] == "nld"
+        assert cultural_item["literal_translation"] == proverbs[1][3]
+        assert cultural_item["cultural_note"] == dutch_cultural
 
 
 async def test_search_uses_the_resolved_dutch_translation(client, database_url):
@@ -303,6 +330,35 @@ async def test_meta_language_coverage_counts_only_published_content(client, data
                 """,
                 (published[0], dutch_id),
             )
+
+
+async def test_english_proverb_translation_requires_a_cultural_note(database_url):
+    unique_key = f"test:proverb:{uuid.uuid4()}"
+    with psycopg.connect(database_url) as conn:
+        try:
+            content_id = conn.execute(
+                """
+                INSERT INTO content_items (source_key, language_id, content_type, target_text)
+                SELECT %s, id, 'proverb', %s
+                  FROM languages
+                 WHERE code = 'ibo'
+                RETURNING id
+                """,
+                (unique_key, unique_key),
+            ).fetchone()[0]
+            english_id = conn.execute("SELECT id FROM languages WHERE code = 'eng'").fetchone()[0]
+
+            with pytest.raises(psycopg.errors.RaiseException, match=r"(?i)cultural.note"):
+                conn.execute(
+                    """
+                    INSERT INTO content_translations
+                        (content_id, meta_language_id, translation, cultural_note)
+                    VALUES (%s, %s, %s, NULL)
+                    """,
+                    (content_id, english_id, "Test English translation"),
+                )
+        finally:
+            conn.rollback()
 
 
 async def test_open_flags_are_unique_per_item_and_translation_scope(database_url):
