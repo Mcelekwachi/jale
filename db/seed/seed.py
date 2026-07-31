@@ -38,6 +38,20 @@ CONTENT_FILES = {
 
 VALID_DIFFICULTY = {"beginner", "intermediate", "advanced", "native"}
 VALID_MODE = {"flashcard", "quiz", "phrase_practice", "proverbs"}
+TARGET_HEADERS = {
+    "source_key",
+    "content_type",
+    "target_text",
+    "target_text_toned",
+    "category_slug",
+    "difficulty",
+}
+TRANSLATION_HEADERS = {
+    "source_key",
+    "translation",
+    "literal_translation",
+    "cultural_note",
+}
 
 
 # --------------------------------------------------------------------------
@@ -78,18 +92,11 @@ def validate_rows(rows, content_type, categories, tone_policy, path):
                 errors.append(f"{loc} duplicate target_text {r['target_text']!r}")
             seen_text.add(key)
 
-        if not r.get("english_translation"):
-            errors.append(f"{loc} missing english_translation")
-
         if r.get("category_slug") not in categories:
             errors.append(f"{loc} unknown category {r.get('category_slug')!r}")
 
         if r.get("difficulty") not in VALID_DIFFICULTY:
             errors.append(f"{loc} bad difficulty {r.get('difficulty')!r}")
-
-        # schema-level CHECK, caught early with a readable message
-        if content_type == "proverb" and not r.get("cultural_note"):
-            errors.append(f"{loc} proverb missing cultural_note")
 
         # tone policy: warning, never an error — policy may change per language
         toned = (r.get("target_text_toned") or "").strip()
@@ -109,14 +116,17 @@ def validate_rows(rows, content_type, categories, tone_policy, path):
 def upsert_language(cur, lang):
     cur.execute(
         """
-        INSERT INTO languages (code, name, endonym, flag_emoji, is_active, sort_order)
+        INSERT INTO languages (code, name, endonym, flag_emoji, is_active,
+                               is_learnable, is_meta, sort_order)
         VALUES (%(code)s, %(name)s, %(endonym)s, %(flag_emoji)s,
-                %(is_active)s, %(sort_order)s)
+                %(is_active)s, %(is_learnable)s, %(is_meta)s, %(sort_order)s)
         ON CONFLICT (code) DO UPDATE SET
             name       = EXCLUDED.name,
             endonym    = EXCLUDED.endonym,
             flag_emoji = EXCLUDED.flag_emoji,
             is_active  = EXCLUDED.is_active,
+            is_learnable = EXCLUDED.is_learnable,
+            is_meta      = EXCLUDED.is_meta,
             sort_order = EXCLUDED.sort_order
         RETURNING id
         """,
@@ -126,6 +136,8 @@ def upsert_language(cur, lang):
             "endonym": lang.get("endonym"),
             "flag_emoji": lang.get("flag_emoji"),
             "is_active": lang.get("is_active", False),
+            "is_learnable": lang.get("is_learnable", False),
+            "is_meta": lang.get("is_meta", False),
             "sort_order": lang.get("sort_order", 100),
         },
     )
@@ -180,30 +192,41 @@ def upsert_content(cur, language_id, dialect_id, cat_ids, rows, position_start=0
     for offset, r in enumerate(rows):
         cur.execute(
             """
+            SELECT c.language_id, l.code AS language_code, c.content_type
+              FROM content_items c
+              JOIN languages l ON l.id = c.language_id
+             WHERE c.source_key = %s
+            """,
+            (r["source_key"],),
+        )
+        owner = cur.fetchone()
+        if owner and (
+            owner["language_id"] != language_id or owner["content_type"] != r["content_type"]
+        ):
+            raise SeedError(
+                f"source_key {r['source_key']!r} ownership mismatch: existing "
+                f"language={owner['language_code']!r}, content_type="
+                f"{owner['content_type']!r}; incoming language_id={language_id}, "
+                f"content_type={r['content_type']!r}"
+            )
+        cur.execute(
+            """
             INSERT INTO content_items (
                 source_key, language_id, dialect_id, category_id,
                 content_type, difficulty_level,
-                target_text, target_text_toned, english_translation,
-                literal_translation, cultural_note,
-                example_sentence, example_translation,
+                target_text, target_text_toned, example_sentence,
                 audio_url, audio_state, sort_order
             ) VALUES (
                 %(source_key)s, %(language_id)s, %(dialect_id)s, %(category_id)s,
                 %(content_type)s, %(difficulty)s,
-                %(target_text)s, %(toned)s, %(english)s,
-                %(literal)s, %(cultural)s,
-                %(example)s, %(example_en)s,
+                %(target_text)s, %(toned)s, %(example)s,
                 %(audio_url)s, %(audio_state)s, %(sort_order)s
             )
             ON CONFLICT (source_key) DO UPDATE SET
                 category_id         = EXCLUDED.category_id,
                 difficulty_level    = EXCLUDED.difficulty_level,
                 target_text         = EXCLUDED.target_text,
-                english_translation = EXCLUDED.english_translation,
-                literal_translation = EXCLUDED.literal_translation,
-                cultural_note       = EXCLUDED.cultural_note,
                 example_sentence    = EXCLUDED.example_sentence,
-                example_translation = EXCLUDED.example_translation,
                 sort_order          = EXCLUDED.sort_order,
                 -- tone marking and audio are contributor-owned once set:
                 -- the seed only fills them, never blanks them.
@@ -213,6 +236,8 @@ def upsert_content(cur, language_id, dialect_id, cat_ids, rows, position_start=0
                                              content_items.audio_url),
                 audio_state       = GREATEST(EXCLUDED.audio_state,
                                              content_items.audio_state)
+            WHERE content_items.language_id = EXCLUDED.language_id
+              AND content_items.content_type = EXCLUDED.content_type
             RETURNING (xmax = 0) AS was_insert
             """,
             {
@@ -224,15 +249,50 @@ def upsert_content(cur, language_id, dialect_id, cat_ids, rows, position_start=0
                 "difficulty": r["difficulty"],
                 "target_text": r["target_text"].strip(),
                 "toned": nullify(r.get("target_text_toned")),
-                "english": r["english_translation"].strip(),
-                "literal": nullify(r.get("literal_translation")),
-                "cultural": nullify(r.get("cultural_note")),
                 "example": nullify(r.get("example_sentence")),
-                "example_en": nullify(r.get("example_translation")),
                 "audio_url": nullify(r.get("audio_url")),
                 "audio_state": "missing",
                 "sort_order": position_start + offset,
             },
+        )
+        result = cur.fetchone()
+        if result is None:
+            raise SeedError(
+                f"source_key {r['source_key']!r} ownership changed during upsert; "
+                "existing language/content_type was not modified"
+            )
+        if result["was_insert"]:
+            inserted += 1
+        else:
+            updated += 1
+    return inserted, updated
+
+
+def upsert_translations(cur, content_ids, language_ids, translations):
+    inserted = updated = 0
+    for row in translations:
+        cur.execute(
+            """
+            INSERT INTO content_translations (
+                content_id, meta_language_id, translation,
+                literal_translation, cultural_note
+            ) VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (content_id, meta_language_id) DO UPDATE SET
+                translation = COALESCE(NULLIF(EXCLUDED.translation, ''),
+                                       content_translations.translation),
+                literal_translation = COALESCE(EXCLUDED.literal_translation,
+                                               content_translations.literal_translation),
+                cultural_note = COALESCE(EXCLUDED.cultural_note,
+                                         content_translations.cultural_note)
+            RETURNING (xmax = 0) AS was_insert
+            """,
+            (
+                content_ids[row["source_key"]],
+                language_ids[row["meta_code"]],
+                row["translation"],
+                row["literal_translation"],
+                row["cultural_note"],
+            ),
         )
         if cur.fetchone()["was_insert"]:
             inserted += 1
@@ -355,7 +415,48 @@ def report_coverage(cur, language_id):
 # --------------------------------------------------------------------------
 
 
-def seed_language(conn, code, dry_run=False):
+def read_csv(path, required_headers, errors):
+    with path.open(encoding="utf-8-sig", newline="") as fh:
+        reader = csv.DictReader(fh)
+        missing = sorted(required_headers - set(reader.fieldnames or []))
+        if missing:
+            errors.append(f"{path}: missing required header(s): {', '.join(missing)}")
+        return [r for r in reader if any((v or "").strip() for v in r.values())]
+
+
+def load_meta_languages(errors):
+    path = CONTENT_ROOT / "meta_languages.yaml"
+    document = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    if not isinstance(document, dict):
+        errors.append(f"{path}: YAML root must be a mapping")
+        return [], {}
+    languages = document.get("languages")
+    if not isinstance(languages, list):
+        errors.append(f"{path}: top-level 'languages' must be a list")
+        return [], {}
+    file_codes, codes = {}, set()
+    for index, lang in enumerate(languages, start=1):
+        loc = f"{path}:languages[{index}]"
+        if not isinstance(lang, dict):
+            errors.append(f"{loc}: language entry must be a mapping")
+            continue
+        for field in ("code", "name", "file_code"):
+            if not lang.get(field):
+                errors.append(f"{loc}: missing {field}")
+        code, file_code = lang.get("code"), lang.get("file_code")
+        if code in codes:
+            errors.append(f"{loc}: duplicate language code {code!r}")
+        codes.add(code)
+        if file_code in file_codes:
+            errors.append(f"{loc}: duplicate file_code {file_code!r}")
+        elif file_code:
+            file_codes[file_code] = code
+        if not lang.get("is_meta", False):
+            errors.append(f"{loc}: meta language must set is_meta: true")
+    return languages, file_codes
+
+
+def prepare_language(code, file_codes):
     lang_dir = CONTENT_ROOT / code
     if not lang_dir.is_dir():
         raise SeedError(f"no content directory at {lang_dir}")
@@ -367,17 +468,90 @@ def seed_language(conn, code, dry_run=False):
     cat_slugs = {c["slug"] for c in categories}
 
     # ---- read + validate before touching the database ----
-    all_rows, errors, warnings = {}, [], []
+    all_rows, errors, warnings, source_types = {}, [], [], {}
     for content_type, filename in CONTENT_FILES.items():
         path = lang_dir / filename
         if not path.exists():
             continue
-        with path.open(encoding="utf-8-sig", newline="") as fh:
-            rows = [r for r in csv.DictReader(fh) if any((v or "").strip() for v in r.values())]
+        rows = read_csv(path, TARGET_HEADERS, errors)
         all_rows[content_type] = rows
         e, w = validate_rows(rows, content_type, cat_slugs, tone_policy, path)
         errors += e
         warnings += w
+        for row in rows:
+            key = row.get("source_key")
+            if key in source_types:
+                errors.append(f"{path}: duplicate source_key {key!r} across content files")
+            elif key:
+                source_types[key] = content_type
+
+    translations = []
+    english_proverb_rows = set()
+    translation_dir = lang_dir / "translations"
+    paths = sorted(translation_dir.glob("*.csv")) if translation_dir.is_dir() else []
+    for path in paths:
+        meta_code = file_codes.get(path.stem)
+        if not meta_code:
+            errors.append(
+                f"{path}: filename code {path.stem!r} is not declared as file_code "
+                "in content/meta_languages.yaml"
+            )
+        rows = read_csv(path, TRANSLATION_HEADERS, errors)
+        seen = set()
+        for line, row in enumerate(rows, start=2):
+            key = (row.get("source_key") or "").strip()
+            loc = f"{path}:{line}"
+            if not key:
+                errors.append(f"{loc}: missing source_key")
+                continue
+            if key in seen:
+                errors.append(f"{loc}: duplicate source_key {key!r}")
+            seen.add(key)
+            if key not in source_types:
+                errors.append(f"{loc}: unknown source_key {key!r}")
+            translation = nullify(row.get("translation"))
+            cultural_note = nullify(row.get("cultural_note"))
+            if meta_code == "eng" and source_types.get(key) == "proverb":
+                english_proverb_rows.add(key)
+                if not translation:
+                    errors.append(f"{loc}: proverb {key!r} missing translation")
+                if not cultural_note:
+                    errors.append(f"{loc}: proverb {key!r} missing cultural_note")
+            if translation:
+                translations.append(
+                    {
+                        "source_key": key,
+                        "meta_code": meta_code,
+                        "translation": translation,
+                        "literal_translation": nullify(row.get("literal_translation")),
+                        "cultural_note": cultural_note,
+                    }
+                )
+
+    english_file_code = next(
+        (file_code for file_code, meta_code in file_codes.items() if meta_code == "eng"),
+        "eng",
+    )
+    english_path = translation_dir / f"{english_file_code}.csv"
+    for key, content_type in source_types.items():
+        if content_type == "proverb" and key not in english_proverb_rows:
+            errors.append(f"{english_path}: proverb {key!r} missing translation")
+            errors.append(f"{english_path}: proverb {key!r} missing cultural_note")
+
+    tracks_path = lang_dir / "tracks.yaml"
+    tracks_document = yaml.safe_load(tracks_path.read_text(encoding="utf-8")) or {}
+    tracks = tracks_document.get("tracks")
+    if not isinstance(tracks, list):
+        errors.append(f"{tracks_path}: top-level 'tracks' must be a list")
+        tracks = []
+    for track in tracks:
+        track_loc = f"{tracks_path}: track {track.get('slug')!r}"
+        for unit in track.get("units", []):
+            if unit.get("mode") not in VALID_MODE:
+                errors.append(f"{track_loc}: bad mode {unit.get('mode')!r}")
+            category = unit.get("category")
+            if category and category not in cat_slugs:
+                errors.append(f"{track_loc}: unknown category {category!r}")
 
     print(f"\n=== {lang['name']} ({code}) ===")
     for content_type, rows in all_rows.items():
@@ -387,40 +561,55 @@ def seed_language(conn, code, dry_run=False):
     for w in warnings:
         print(f"  WARN  {w}")
     if errors:
-        for e in errors:
-            print(f"  ERROR {e}", file=sys.stderr)
-        raise SeedError(f"{len(errors)} validation error(s) — nothing written")
+        return None, errors
+    return {
+        "spec": spec,
+        "code": code,
+        "lang": lang,
+        "categories": categories,
+        "all_rows": all_rows,
+        "translations": translations,
+        "source_keys": set(source_types),
+        "lang_dir": lang_dir,
+        "tracks": tracks,
+    }, []
 
-    if dry_run:
-        print("  dry run — no writes")
-        return
 
+def write_language(conn, plan, meta_languages):
+    spec, lang = plan["spec"], plan["lang"]
+    categories, all_rows = plan["categories"], plan["all_rows"]
     with conn.cursor(row_factory=dict_row) as cur:
+        language_ids = {m["code"]: upsert_language(cur, m) for m in meta_languages}
         language_id = upsert_language(cur, lang)
         dialects = upsert_dialects(cur, language_id, spec.get("dialects", []))
         default_dialect = next(
             (d["code"] for d in spec.get("dialects", []) if d.get("is_default")), None
         )
-        dialect_id = dialects.get(default_dialect)
         cat_ids = upsert_categories(cur, language_id, categories)
-
         base = {"word": 0, "phrase": 1000, "proverb": 2000}
         totals = [0, 0]
         for content_type, rows in all_rows.items():
             ins, upd = upsert_content(
-                cur, language_id, dialect_id, cat_ids, rows, base[content_type]
+                cur,
+                language_id,
+                dialects.get(default_dialect),
+                cat_ids,
+                rows,
+                base[content_type],
             )
             totals[0] += ins
             totals[1] += upd
         print(f"  content: {totals[0]} inserted, {totals[1]} updated")
-
-        tracks = yaml.safe_load((lang_dir / "tracks.yaml").read_text(encoding="utf-8"))
-        upsert_tracks(cur, language_id, cat_ids, tracks["tracks"])
-        print(f"  tracks:  {len(tracks['tracks'])} upserted")
-
+        cur.execute(
+            "SELECT source_key, id FROM content_items WHERE source_key = ANY(%s)",
+            (list(plan["source_keys"]),),
+        )
+        content_ids = {row["source_key"]: row["id"] for row in cur.fetchall()}
+        ins, upd = upsert_translations(cur, content_ids, language_ids, plan["translations"])
+        print(f"  translations: {ins} inserted, {upd} updated")
+        upsert_tracks(cur, language_id, cat_ids, plan["tracks"])
+        print(f"  tracks:  {len(plan['tracks'])} upserted")
         report_coverage(cur, language_id)
-
-    conn.commit()
 
 
 def main():
@@ -442,15 +631,58 @@ def main():
         else [args.language]
     )
 
-    conn = None if args.dry_run else psycopg.connect(args.database_url)
+    errors = []
     try:
-        for code in codes:
-            seed_language(conn, code, dry_run=args.dry_run)
+        meta_languages, file_codes = load_meta_languages(errors)
+    except (OSError, TypeError, yaml.YAMLError) as exc:
+        meta_languages, file_codes = [], {}
+        errors.append(f"{CONTENT_ROOT / 'meta_languages.yaml'}: {exc}")
+    plans = []
+    for code in codes:
+        try:
+            plan, language_errors = prepare_language(code, file_codes)
+            errors.extend(language_errors)
+            if plan:
+                plans.append(plan)
+        except (OSError, KeyError, TypeError, yaml.YAMLError, SeedError) as exc:
+            errors.append(f"{CONTENT_ROOT / code}: {exc}")
+    source_key_owners = {}
+    for plan in plans:
+        for source_key in plan["source_keys"]:
+            owner = source_key_owners.get(source_key)
+            if owner is not None:
+                errors.append(
+                    f"content/{plan['code']}: source_key {source_key!r} collides with "
+                    f"content/{owner}; source_key must be globally unique"
+                )
+            else:
+                source_key_owners[source_key] = plan["code"]
+    if errors:
+        for error in errors:
+            print(f"  ERROR {error}", file=sys.stderr)
+        print(
+            f"\nseed failed: {len(errors)} validation error(s) — nothing written",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if args.dry_run:
+        print("\ndry run — all content valid; no database connection or writes")
+        print("\ndone.\n")
+        return
+
+    conn = psycopg.connect(args.database_url)
+    try:
+        for plan in plans:
+            write_language(conn, plan, meta_languages)
+        conn.commit()
     except SeedError as exc:
         print(f"\nseed failed: {exc}", file=sys.stderr)
         if conn:
             conn.rollback()
         sys.exit(1)
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         if conn:
             conn.close()

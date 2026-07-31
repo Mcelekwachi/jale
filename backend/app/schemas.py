@@ -31,6 +31,11 @@ class StudyMode(str, Enum):
     proverbs = "proverbs"
 
 
+class StudyDirection(str, Enum):
+    target_to_meta = "target_to_meta"
+    meta_to_target = "meta_to_target"
+
+
 class AgeBand(str, Enum):
     child_u13 = "child_u13"
     young_adult_13_25 = "young_adult_13_25"
@@ -75,6 +80,11 @@ class Language(BaseModel):
     is_active: bool
 
 
+class MetaLanguageCoverage(Language):
+    translated_count: int
+    total_count: int
+
+
 class Category(BaseModel):
     slug: str
     name: str
@@ -92,7 +102,9 @@ class ContentItem(BaseModel):
 
     target_text: str
     target_text_toned: str | None = None
-    english_translation: str
+    translation: str
+    meta_language: str
+    meta_language_used: str
     literal_translation: str | None = None
     cultural_note: str | None = None
     example_sentence: str | None = None
@@ -156,6 +168,8 @@ class StudyItem(BaseModel):
     content_type: ContentType
     prompt: str
     answer: str
+    meta_language: str
+    meta_language_used: str
     audio_url: str | None = None
     audio_state: str
 

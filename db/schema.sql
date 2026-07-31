@@ -65,7 +65,9 @@ CREATE TABLE languages (
   name          TEXT NOT NULL,                 -- 'Igbo'
   endonym       TEXT,                          -- 'Asụsụ Igbo'
   flag_emoji    TEXT,
-  is_active     BOOLEAN NOT NULL DEFAULT FALSE,-- Phase 1: only Igbo is TRUE
+  is_active     BOOLEAN NOT NULL DEFAULT FALSE,-- available for use in the app
+  is_learnable  BOOLEAN NOT NULL DEFAULT FALSE,
+  is_meta       BOOLEAN NOT NULL DEFAULT FALSE,
   sort_order    SMALLINT NOT NULL DEFAULT 100,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -114,10 +116,6 @@ CREATE TABLE content_items (
 
   target_text         TEXT NOT NULL,           -- 'Ndewo'
   target_text_toned   TEXT,                    -- tone-marked variant, nullable
-  english_translation TEXT NOT NULL,           -- 'Hello'
-  literal_translation TEXT,                    -- proverbs: word-for-word gloss
-  cultural_note       TEXT,                    -- proverbs: the deeper lesson
-
   example_sentence    TEXT,
   example_translation TEXT,
 
@@ -134,11 +132,7 @@ CREATE TABLE content_items (
   sort_order          INTEGER NOT NULL DEFAULT 100,
 
   created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-
-  -- proverbs must carry their cultural lesson; that's the whole point
-  CONSTRAINT proverbs_need_meaning
-    CHECK (content_type <> 'proverb' OR cultural_note IS NOT NULL)
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- prevents accidental duplicates when seeding, e.g. "Ndewo" twice as a word
@@ -180,6 +174,23 @@ ALTER TABLE content_items
     FOREIGN KEY (contributor_id) REFERENCES app_users(id) ON DELETE SET NULL,
   ADD CONSTRAINT content_items_verifier_fk
     FOREIGN KEY (verified_by) REFERENCES app_users(id) ON DELETE SET NULL;
+
+-- Translations are keyed by content and meta-language so adding an explanation
+-- language does not duplicate the target-language content.
+CREATE TABLE content_translations (
+  content_id          BIGINT NOT NULL REFERENCES content_items(id) ON DELETE CASCADE,
+  meta_language_id    SMALLINT NOT NULL REFERENCES languages(id),
+  translation         TEXT NOT NULL,
+  literal_translation TEXT,
+  cultural_note       TEXT,
+  verified            BOOLEAN NOT NULL DEFAULT FALSE,
+  verified_by         UUID REFERENCES app_users(id) ON DELETE SET NULL,
+  verified_at         TIMESTAMPTZ,
+  contributor_id      UUID REFERENCES app_users(id) ON DELETE SET NULL,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (content_id, meta_language_id)
+);
 
 -- Which languages a contributor is trusted for (Phase 2 uses it, Phase 1
 -- just needs the row to exist so permissions aren't a code change later).
@@ -318,6 +329,7 @@ CREATE TABLE content_flags (
   id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   content_id      BIGINT NOT NULL REFERENCES content_items(id) ON DELETE CASCADE,
   user_id         UUID REFERENCES app_users(id) ON DELETE SET NULL,
+  meta_language_id SMALLINT REFERENCES languages(id),
   reason          flag_reason NOT NULL,
   note            TEXT,
   status          flag_status NOT NULL DEFAULT 'open',
@@ -326,9 +338,10 @@ CREATE TABLE content_flags (
   resolved_at     TIMESTAMPTZ,
   resolution_note TEXT
 );
--- one open flag per user per item — stops a single user inflating flag_count
+-- one open flag per user per item and meta-language scope
 CREATE UNIQUE INDEX one_open_flag_per_user
-  ON content_flags (content_id, user_id) WHERE status IN ('open', 'in_review');
+  ON content_flags (content_id, user_id, COALESCE(meta_language_id, 0))
+  WHERE status IN ('open', 'in_review');
 
 -- Audit trail for every edit an admin or contributor makes.
 CREATE TABLE content_revisions (
@@ -351,8 +364,40 @@ $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER content_items_touch BEFORE UPDATE ON content_items
   FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+CREATE TRIGGER content_translations_touch BEFORE UPDATE ON content_translations
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 CREATE TRIGGER user_preferences_touch BEFORE UPDATE ON user_preferences
   FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
+-- The seeded English/default proverb translation must carry its cultural lesson;
+-- other meta languages may fall back to that lesson independently.
+CREATE OR REPLACE FUNCTION require_proverb_translation_cultural_note()
+RETURNS TRIGGER AS $$
+DECLARE
+  parent_type content_type;
+  translation_language CHAR(3);
+BEGIN
+  SELECT content_type INTO parent_type
+    FROM content_items
+   WHERE id = NEW.content_id;
+
+  SELECT code INTO translation_language
+    FROM languages
+   WHERE id = NEW.meta_language_id;
+
+  IF parent_type = 'proverb'
+     AND translation_language = 'eng'
+     AND NEW.cultural_note IS NULL THEN
+    RAISE EXCEPTION 'cultural_note is required for proverb translations';
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER content_translations_require_proverb_note
+  BEFORE INSERT OR UPDATE ON content_translations
+  FOR EACH ROW EXECUTE FUNCTION require_proverb_translation_cultural_note();
 
 -- keep content_items.flag_count in sync with open flags
 CREATE OR REPLACE FUNCTION sync_flag_count() RETURNS TRIGGER AS $$
@@ -381,16 +426,20 @@ SELECT c.id            AS content_id,
        l.name          AS language,
        c.content_type,
        c.target_text,
-       c.english_translation,
+       ml.code         AS meta_language,
+       ct.translation,
        c.flag_count,
-       c.verified,
+       ct.verified,
        min(f.created_at) AS oldest_flag_at,
        array_agg(DISTINCT f.reason) AS reasons
   FROM content_items c
   JOIN languages l ON l.id = c.language_id
   JOIN content_flags f ON f.content_id = c.id
+  LEFT JOIN languages ml ON ml.id = f.meta_language_id
+  LEFT JOIN content_translations ct
+    ON ct.content_id = c.id AND ct.meta_language_id = f.meta_language_id
  WHERE f.status IN ('open','in_review')
- GROUP BY c.id, l.name
+ GROUP BY c.id, l.name, ml.code, ct.translation, ct.verified
  ORDER BY c.flag_count DESC, oldest_flag_at ASC;
 
 -- ---------------------------------------------------------------------

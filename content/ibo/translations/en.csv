@@ -1,0 +1,158 @@
+source_key,translation,literal_translation,cultural_note
+ibo:word:ndewo,Hello,,
+ibo:word:daalu,Thank you,,
+ibo:word:biko,Please,,
+ibo:word:ee,Yes,,
+ibo:word:mba,No,,
+ibo:word:ndo,Sorry,,
+ibo:word:kedu,How are you,,
+ibo:word:ka-o-di,Goodbye,,
+ibo:word:ekele,Greetings,,
+ibo:word:ututu,Morning,,
+ibo:word:abali,Night,,
+ibo:word:oge,Time,,
+ibo:word:ubochi,Day,,
+ibo:word:taa,Today,,
+ibo:word:echi,Tomorrow,,
+ibo:word:unyaahu,Yesterday,,
+ibo:word:mmiri,Water,,
+ibo:word:nri,Food,,
+ibo:word:azu,Fish,,
+ibo:word:ulo,House,,
+ibo:word:uzo,"Road, way",,
+ibo:word:ahia,Market,,
+ibo:word:ulo-akwukwo,School,,
+ibo:word:akwukwo,Book,,
+ibo:word:aha,Name,,
+ibo:word:okwu,"Word, matter",,
+ibo:word:asusu,Language,,
+ibo:word:oru,"Work, job",,
+ibo:word:ukwu-great,"Great, big",,
+ibo:word:ego,Money,,
+ibo:word:onye,"Person, who",,
+ibo:word:ebe,"Place, where",,
+ibo:word:gini,What,,
+ibo:word:nwoke,Man,,
+ibo:word:nwanyi,Woman,,
+ibo:word:nwa,Child,,
+ibo:word:nne,Mother,,
+ibo:word:nna,Father,,
+ibo:word:enyi,Friend,,
+ibo:word:ezinulo,Family,,
+ibo:word:isi,Head,,
+ibo:word:anya,Eye,,
+ibo:word:onu,Mouth,,
+ibo:word:aka,Hand,,
+ibo:word:ukwu-leg,"Leg, foot",,
+ibo:word:obi,Heart,,
+ibo:word:bia,Come,,
+ibo:word:gaa,Go,,
+ibo:word:rie,Eat,,
+ibo:word:otu,One,,
+ibo:word:abuo,Two,,
+ibo:word:ato,Three,,
+ibo:word:ano,Four,,
+ibo:word:agu,Tiger,,
+ibo:word:ewu,Goat,,
+ibo:word:uloogwu,Hospital,,
+ibo:word:ogwu,Medicine,,
+ibo:phrase:ndewo,Hello,,
+ibo:phrase:nnoo,Welcome,,
+ibo:phrase:ututu-oma,Good morning,Morning good,
+ibo:phrase:ehihie-oma,Good afternoon,Afternoon good,
+ibo:phrase:mgbede-oma,Good evening,Evening good,
+ibo:phrase:ka-chi-fo,Good night,May the day break,
+ibo:phrase:ka-o-di,Goodbye,Let it be,
+ibo:phrase:ka-anyi-hu-echi,See you tomorrow,Let us see tomorrow,
+ibo:phrase:biko,Please,,
+ibo:phrase:daalu,Thank you,,
+ibo:phrase:daalu-nke-ukwuu,Thank you very much,Thank you greatly,
+ibo:phrase:ndo,Sorry,,
+ibo:phrase:kedu-ka-i-mere,How are you,How have you done,
+ibo:phrase:a-di-m-mma,I am fine,It is well with me,
+ibo:phrase:kedu-aha-gi,What is your name,What name yours,
+ibo:phrase:aha-m-bu,My name is,Name my is,
+ibo:phrase:ebee-ka-i-si,Where are you from,Where is it you come from,
+ibo:phrase:e-si-m,I am from,Come I from,
+ibo:phrase:gini-bu-nke-a,What is this,What is this one,
+ibo:phrase:nsogbu-adighi,No problem,Trouble is not,
+ibo:phrase:o-di-mma,"It is okay, it is good",It is good,
+ibo:phrase:ebee-ka-i-na-aga,Where are you going,Where is it you are going,
+ibo:phrase:kedu-oge-o-bu,What time is it,What time is it,
+ibo:phrase:echegbula-onwe-gi,Do not worry,Do not kill yourself with thought,
+ibo:phrase:gini-ka-nke-a-putara,What does this mean,What does this one come out as,
+ibo:phrase:biko-nyere-m-aka,Please help me,Please give me hand,
+ibo:phrase:aghotaghi-m,I do not understand,Understand not I,
+ibo:phrase:biko-kwuo-ya-ozo,Please say it again,Please say it again,
+ibo:phrase:biko-jiri-nwayo-kwuo-okwu,Please speak slowly,Please use gentleness to speak words,
+ibo:phrase:i-na-asu-bekee,Do you speak English,You are speaking English,
+ibo:phrase:ana-m-asu-igbo-ntakiri,I speak a little Igbo,Speak I Igbo small,
+ibo:phrase:ebee-ka-ulo-mposi-di,Where is the toilet,Where is it the toilet house is,
+ibo:phrase:ego-ole-ka-o-bu,How much is it,Money how much is it,
+ibo:phrase:o-di-oke-onu,It is too expensive,It is excessively costly,
+ibo:phrase:achoro-m-nke-a,I want this,Want I this one,
+ibo:phrase:achoghi-m-ya,I do not want it,Want not I it,
+ibo:phrase:aguu-na-agu-m,I am hungry,Hunger is hungering me,
+ibo:phrase:akpiri-na-akpo-m-nku,I am thirsty,Throat is calling me dry,
+ibo:phrase:ka-anyi-gaa,Let us go,Let us go,
+ibo:phrase:bia-ebe-a,Come here,Come place this,
+ibo:phrase:chere-obere,Wait a moment,Wait small,
+ibo:phrase:nodu-ala,Sit down,Stay ground,
+ibo:phrase:bilie,Stand up,Rise,
+ibo:phrase:mepee-uzo,Open the door,Open door,
+ibo:phrase:mechie-uzo,Close the door,Close door,
+ibo:phrase:gee-nti,Listen,Give ear,
+ibo:phrase:kpachara-anya,Be careful,Clear the eye,
+ibo:phrase:obi-di-m-uto-ihu-gi,I am happy to see you,Heart is sweet to me to see you,
+ibo:phrase:a-huru-m-gi-n-anya,I love you,See I you in eye,
+ibo:phrase:a-na-m-atu-uche-gi,I miss you,Am I casting thought of you,
+ibo:proverb:egbe-bere-ugo-bere,Live and let live; anyone denying others freedom deserves the consequences.,"Let the kite perch, let the eagle perch; whichever tells the other not to perch, let its wing break.","The best known of all Igbo proverbs and often treated as a statement of the Igbo social contract. The kite and the eagle are both birds of prey with equal claim to the sky, so the image argues for coexistence between equals rather than tolerance granted by a superior to an inferior. It is invoked in disputes over land, office and communal rights."
+ibo:proverb:onye-kwe-chi-ya-ekwe,When someone is determined their personal destiny supports them.,"If a person agrees, his chi agrees.","Rests on the concept of chi, the personal spirit or destiny that accompanies each individual. The proverb places human will first: the chi responds to the person's own consent rather than dictating to them, which is why Igbo thought is often described as balancing destiny with personal effort."
+ibo:proverb:igwe-bu-ike,Unity is strength.,Multitude is strength.,"A short, widely used motto found on town union banners, age-grade associations and family crests. It underpins the communal decision-making tradition in which authority rests with the assembly rather than a single ruler."
+ibo:proverb:otu-osisi-anaghi-eme-ohia,One tree cannot make a forest; cooperation is necessary.,One tree does not make a forest.,"Used to check individualism, especially when someone claims sole credit for communal achievement. Often paired in speech with the one-hand proverb below."
+ibo:proverb:otu-aka-anaghi-ebu-ngwugwu,One hand cannot lift a heavy load; people need help.,One hand does not carry a bundle.,"A practical companion to the forest proverb. Commonly cited when asking for assistance without shame, since needing help is framed as ordinary rather than weak."
+ibo:proverb:onye-nwere-madu-ka-onye-nwere-ego,Having supportive people is greater than having money.,One who has people surpasses one who has money.,"Expresses the ranking of social capital above material wealth. It is often quoted at funerals and title ceremonies, where the size and warmth of the gathering is read as the true measure of a life."
+ibo:proverb:nwanne-di-na-mba,Your relative or helper may be found anywhere.,A sibling exists in foreign lands.,A diaspora proverb long before the modern diaspora. It legitimises kinship formed through kindness rather than blood and is the traditional greeting logic behind Igbo town unions abroad.
+ibo:proverb:agwo-no-n-akirika,A person is often protected by their environment or community.,The snake in the thicket is protected by the thicket.,"A caution against despising the community that shields you. It is also used in reverse, to warn that someone's apparent power may belong to their backers rather than themselves."
+ibo:proverb:a-na-amata-dike-n-agha,A brave person is known during difficult times.,A warrior is known in battle.,"Dike is not merely a fighter but a person of proven capacity. The proverb withholds judgement until pressure arrives, and is often used to defer praise rather than to give it."
+ibo:proverb:ihe-onye-metara-o-buru,Everyone must face the consequences of their actions.,"What one has done, one carries.",A statement of personal accountability that limits how far kin are expected to absorb an individual's wrongdoing.
+ibo:proverb:onye-ajuru-anaghi-aju-onwe-ya,Rejection should not make you reject or undervalue yourself.,One who is rejected does not reject himself.,"Offered as consolation to someone passed over for marriage, office or inclusion. It separates other people's verdict from a person's own estimation of their worth."
+ibo:proverb:anu-gbaa-ajo-oso,An extraordinary problem requires an extraordinary response.,"If an animal runs an unusual race, it is shot with an unusual gun.","A proportionality proverb from the hunting register. It justifies a severe response as fitted to a severe provocation, and is often used in council to defend an unusual decision."
+ibo:proverb:ebe-onye-dara,People often focus on their failure instead of its true cause.,"Where a person fell is where he looks, not where he stumbled.","A diagnostic proverb. It argues that the visible collapse is rarely the origin of the problem, and is used to push an inquiry backwards toward the real cause."
+ibo:proverb:a-naghi-ano-otu-ebe-ekiri-mmanwu,Look at an issue from different perspectives.,One does not stand in one place to watch a masquerade.,"Drawn from the masquerade performance, which moves through the arena so that no single vantage point shows the whole. It is the standard Igbo argument for hearing more than one account before judging."
+ibo:proverb:mmanwu-anaghi-ama-onye-nwe-ya,Power or danger may eventually harm even its creator.,The masquerade does not spare the one who owns it.,"A warning against summoning forces you assume will remain loyal. Frequently applied to political violence, thugs and unchecked authority."
+ibo:proverb:ezi-aha-ka-ego,A good name is more valuable than money.,A good name surpasses money.,"Reputation is treated as an inheritable asset in Igbo society, attaching to a family and lineage rather than only an individual."
+ibo:proverb:aha-oma-ka-aku,A good reputation is better than wealth.,A good name surpasses wealth.,"A close variant of the preceding proverb, using akụ, accumulated wealth or property, rather than ego, money. The pairing of the two is common in speeches."
+ibo:proverb:o-bu-onye-kporo-nku,The person experiencing a problem understands it best.,It is the one who gathered the firewood that the rain concerns.,Asserts the authority of lived experience over outside commentary. Often used to hand the floor back to the person actually affected by a decision.
+ibo:proverb:afo-anaghi-anu-okwu,A hungry stomach does not listen to advice.,The stomach does not hear words.,A realist proverb about material need preceding moral instruction. It is used to argue that welfare must come before lecturing.
+ibo:proverb:aguu-adighi-ama-onye-eze,Hunger respects neither kings nor ordinary people.,Hunger does not know a king.,"A levelling proverb. Hunger is one of several forces in Igbo speech, alongside death and truth, treated as indifferent to rank."
+ibo:proverb:a-na-amuta-amuta,Learning never ends; nobody knows everything.,One keeps learning; not knowing is not knowing.,"A humility formula often used by elders when conceding a point to a younger person, and a natural closing proverb for a lesson."
+ibo:proverb:aka-aja-aja,Hard work brings prosperity and enjoyment.,Hands covered in sand bring a mouth covered in oil.,Built on the farming image of soil on the hands and palm oil on the lips. It dignifies manual labour by tying it directly to the enjoyment that follows.
+ibo:proverb:nkita-nwere-ndidi,Patience brings great rewards.,A dog that has patience eats the big bone.,"Ndidi, endurance, is treated as an active virtue rather than passive waiting. The proverb is common counsel to the young and impatient."
+ibo:proverb:ihe-di-mma-na-ewe-oge,Good things take time.,A good thing takes time.,"Used to defend a slow, careful process against pressure for quick results."
+ibo:proverb:e-jiri-ututu-mara-ubochi-oma,A good beginning often suggests a good outcome.,One knows a good day by its morning.,"Used to praise a promising start, and in its negative form to raise early warning about a venture that begins badly."
+ibo:proverb:ututu-tutu,Starting early helps one succeed.,Early morning is the eye by which one sees the road.,"Tied to farming life, where the productive hours are before the heat. It is standard encouragement to begin work early."
+ibo:proverb:a-naghi-eji-oso-agbata-ije-oma,Important work should not be rushed.,One does not run in order to make a good journey.,Distinguishes speed from progress. Frequently used to slow down a decision that people want made hastily.
+ibo:proverb:ngana-kpuchie-ute,Hunger eventually exposes a lazy person.,Laziness covers itself with a mat; hunger uncovers it.,A sharp proverb about consequences arriving on their own schedule. The mat image suggests laziness disguised as rest.
+ibo:proverb:onye-ura-na-ato,Too much comfort or laziness can leave obligations unpaid.,He who finds sleep sweet is held by debt.,Pairs comfort with accumulating obligation. Often used where someone enjoys the present while a duty goes unmet.
+ibo:proverb:onye-ruo-o-rie,Those who work deserve to eat.,"Whoever works, let him eat.",A statement of earned entitlement that also functions as a defence of the worker's claim on the product of their labour.
+ibo:proverb:onye-anaghi-aru-oru,Do not expect rewards without effort.,One who does not work should not expect to eat.,The negative form of the preceding proverb. The two are often quoted together as a pair.
+ibo:proverb:onye-buru-chi-ya-uzo,Do not try to run ahead of your destiny.,One who goes ahead of his chi kills himself running.,"The counterweight to onye kwe chi ya ekwe. Together the two proverbs frame the Igbo view of effort and destiny as partners, where either one running ahead of the other is a failure."
+ibo:proverb:onye-na-amaghi-ebe-mmiri-bidoro,To understand the present you must know the past.,One who does not know where the rain began to beat him will not know where it stopped.,"A history proverb, quoted often in discussions of origins, migration and unresolved grievance. It treats ignorance of the past as an obstacle to any real resolution."
+ibo:proverb:okuko-ruo-n-ulo-madu,In another person's home behave respectfully.,"When a fowl enters someone's house, it knows where to stand.","Governs conduct as a guest. Even the fowl, the least ceremonious of animals, is credited with knowing its place in another compound."
+ibo:proverb:okuko-anaghi-echefu,Never forget someone who helped you during hardship.,A fowl does not forget the one who dried its tail on a rainy day.,Gratitude for help given in bad weather is a recurring theme in Igbo speech. The proverb is used both to praise loyalty and to shame those who forget benefactors.
+ibo:proverb:a-naghi-agba-aka-ahu-nne-madu,Never visit someone empty-handed when a gift is appropriate.,One does not go empty-handed to see someone's mother.,"Codifies the expectation that a visit carries something with it. The gift is a token of regard rather than payment, and its absence reads as indifference."
+ibo:proverb:onye-wetara-oji,Offering kola nuts represents welcome peace and goodwill.,He who brings kola brings life.,"Kola nut, oji, opens nearly every formal Igbo gathering. Its breaking and sharing is a rite of welcome, prayer and peace, and this proverb is spoken as part of that rite."
+ibo:proverb:oji-anaghi-aghota-bekee,Traditional customs should be observed in their proper cultural form.,Kola does not understand English.,"Said when the kola rite is about to be performed, marking the switch into Igbo. It asserts that certain ceremonies lose their meaning if conducted in a borrowed language."
+ibo:proverb:onu-kwuru-njo,A person who speaks badly can also choose to speak well.,The mouth that spoke evil will speak good.,"Holds open the possibility of repair after harsh words. It is used in reconciliation, particularly to allow an offender a route back."
+ibo:proverb:onu-anaghi-agba-oso,Think before speaking because you are responsible for your words.,The mouth does not run faster than its owner.,Ties speech firmly to the speaker. A person cannot disown what their mouth has committed them to.
+ibo:proverb:ire-di-nro,Gentle words can overcome strong resistance.,A soft tongue breaks bone.,"A negotiation proverb, valuing persuasion over force. It is often quoted before sending an emissary into a difficult conversation."
+ibo:proverb:eziokwu-bu-ndu,Truth gives life and preserves trust.,Truth is life.,"One of the shortest and most frequently invoked Igbo proverbs, used in oath-taking and in settling disputes."
+ibo:proverb:ugha-nwere-obere-ukwu,Lies do not travel far before they are discovered.,A lie has short legs.,The natural counterpart to eziokwu bụ ndụ. The two are commonly spoken in sequence.
+ibo:proverb:ihe-e-dere-ede,Written information is preserved better than memory alone.,What is written down is not lost.,"A comparatively modern proverb reflecting the value placed on literacy and record-keeping, and often quoted in support of formal education."
+ibo:proverb:nwata-kwoo-aka,A well-behaved child earns respect among elders.,"If a child washes his hands, he eats with elders.",Access to the elders' company is presented as earned through conduct rather than granted by age. Widely used in raising children and in praising a young person's maturity.
+ibo:proverb:a-na-esi-n-ulo-mara-mma,Good character and success begin at home.,One looks good from inside the house before coming out to the square.,Locates responsibility for a person's public conduct in their upbringing. Frequently cited in discussions of parenting.
+ibo:proverb:nne-bu-nne,A mother remains a mother even when her child behaves badly.,A mother is a mother even if the child is a bad child.,Marks the maternal bond as unconditional in a way few other relationships are treated. Often heard when a family is deciding how to handle a difficult child.
+ibo:proverb:nwaanyi-bu-ulo,Women are central to building and maintaining the family.,A woman is the home.,Ụlọ here means the household as an institution rather than the building. The proverb is used in marriage rites and in praise of a wife or mother.
+ibo:proverb:nwa-bu-nke-oha,The whole community shares responsibility for raising a child.,A child belongs to the community.,"Underlies the practice of communal correction, in which any adult may guide or discipline any child, and the expectation that a village shares in a child's success."
+ibo:proverb:ihe-okenye-huru,Experience gives elders insight that youth may not possess.,"What an elder sees sitting on the ground, a child cannot see from the top of a tree.","The classic defence of seniority in Igbo deliberation. Height, a proxy for advantage, is deliberately given to the child so that experience alone accounts for the difference."

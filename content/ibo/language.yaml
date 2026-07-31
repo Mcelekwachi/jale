@@ -7,6 +7,8 @@ language:
   endonym: Asụsụ Igbo
   flag_emoji: "🇳🇬"
   is_active: true
+  is_learnable: true
+  is_meta: false
   sort_order: 10
 
 dialects:
