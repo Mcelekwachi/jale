@@ -8,11 +8,13 @@ from app.schemas import (
     Connection,
     Goal,
     ResolvedTrack,
+    StudyDirection,
     StudySession,
     Style,
     Track,
 )
 from app.services import study, track_resolver
+from app.services.meta_languages import resolve_meta_languages
 
 router = APIRouter(prefix="/v1/tracks", tags=["tracks"])
 
@@ -77,12 +79,26 @@ async def get_unit_items(
     slug: str,
     position: int,
     language: str | None = None,
+    meta_language: str | None = None,
+    direction: StudyDirection = StudyDirection.target_to_meta,
     shuffle_seed: int | None = Query(
         default=None,
         description="Pass a seed for reproducible ordering; omit for source order.",
     ),
 ) -> dict:
-    session = await study.build_session(_lang(language), slug, position, shuffle_seed)
+    settings = get_settings()
+    requested_meta_language, default_meta_language = await resolve_meta_languages(
+        meta_language, settings.default_meta_language
+    )
+    session = await study.build_session(
+        _lang(language),
+        slug,
+        position,
+        requested_meta_language,
+        default_meta_language,
+        direction,
+        shuffle_seed,
+    )
     if session is None:
         raise HTTPException(status_code=404, detail=f"no unit {position} on track {slug!r}")
     return session
