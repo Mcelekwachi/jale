@@ -46,25 +46,40 @@ def committed_dutch_translations(
             )
 
 
-def content_rows(database_url: str, where: str = "TRUE", limit: int = 1) -> list[tuple]:
+def select_content_rows(
+    database_url: str, selector: str = "TRUE", expected_count: int = 1
+) -> list[tuple]:
     with psycopg.connect(database_url) as conn:
-        return conn.execute(
+        rows = conn.execute(
             f"""  # noqa: S608 - the predicate is test-owned, never user input
             SELECT c.id, c.target_text, ct.translation,
                    ct.literal_translation, ct.cultural_note
               FROM content_items c
               JOIN content_translations ct ON ct.content_id = c.id
               JOIN languages ml ON ml.id = ct.meta_language_id AND ml.code = 'eng'
-             WHERE c.status = 'published' AND {where}
+             WHERE c.status = 'published' AND {selector}
              ORDER BY c.sort_order, c.id
              LIMIT %s
             """,
-            (limit,),
+            (expected_count,),
         ).fetchall()
+    assert len(rows) == expected_count, (
+        f"selector {selector!r} returned {len(rows)} seeded rows; " f"expected {expected_count}"
+    )
+    return rows
 
 
-def content_row(database_url: str, where: str = "TRUE") -> tuple:
-    return content_rows(database_url, where)[0]
+def select_content_row(database_url: str, selector: str = "TRUE") -> tuple:
+    return select_content_rows(database_url, selector)[0]
+
+
+def assert_well_formed_quiz_options(item: dict) -> None:
+    options = item["options"]
+    assert len(options) == 4
+    assert len({option["text"] for option in options}) == 4, "duplicate options"
+    correct = [option for option in options if option["is_correct"]]
+    assert len(correct) == 1
+    assert correct[0]["text"] == item["answer"]
 
 
 # --- health -----------------------------------------------------------------
@@ -186,7 +201,7 @@ async def test_empty_dutch_seed_falls_back_to_english_per_row(client):
 
 
 async def test_one_dutch_translation_produces_a_mixed_page(client, database_url):
-    selected = content_row(database_url)
+    selected = select_content_row(database_url)
     with committed_dutch_translations(
         database_url, [(selected[0], "Unieke Nederlandse vertaling", None, None)]
     ):
@@ -208,11 +223,11 @@ async def test_one_dutch_translation_produces_a_mixed_page(client, database_url)
 async def test_requested_translation_falls_back_each_optional_field_independently(
     client, database_url
 ):
-    proverbs = content_rows(
+    proverbs = select_content_rows(
         database_url,
         "c.content_type = 'proverb' AND ct.literal_translation IS NOT NULL "
         "AND ct.cultural_note IS NOT NULL",
-        limit=2,
+        expected_count=2,
     )
     dutch_literal = "Nederlandse letterlijke vertaling"
     dutch_cultural = "Nederlandse culturele uitleg"
@@ -247,7 +262,7 @@ async def test_requested_translation_falls_back_each_optional_field_independentl
 
 
 async def test_search_uses_the_resolved_dutch_translation(client, database_url):
-    ndewo = content_row(database_url, "c.target_text = 'Ndewo'")
+    ndewo = select_content_row(database_url, "c.target_text = 'Ndewo'")
     with committed_dutch_translations(database_url, [(ndewo[0], "hallo", None, None)]):
         r = await client.get(
             "/v1/content", params={"language": "ibo", "meta_language": "nld", "q": "hallo"}
@@ -282,7 +297,7 @@ async def test_seeded_translation_counts(database_url):
 
 
 async def test_meta_language_coverage_counts_only_published_content(client, database_url):
-    published = content_row(database_url)
+    published = select_content_row(database_url)
     draft_key = f"test:draft:{uuid.uuid4()}"
     with psycopg.connect(database_url, autocommit=True) as conn:
         dutch_id = conn.execute("SELECT id FROM languages WHERE code = 'nld'").fetchone()[0]
@@ -502,7 +517,9 @@ async def test_flashcard_session_shape(client):
     assert item["options"] is None
 
 
-async def test_study_direction_defaults_to_target_then_swaps_prompt_and_answer(client):
+async def test_study_direction_defaults_to_target_then_swaps_prompt_and_answer(
+    client, database_url
+):
     params = {"meta_language": "nld", "shuffle_seed": 17}
     default = await client.get("/v1/tracks/ibo_foundations/units/1/items", params=params)
     reverse = await client.get(
@@ -512,12 +529,31 @@ async def test_study_direction_defaults_to_target_then_swaps_prompt_and_answer(c
     assert default.status_code == reverse.status_code == 200
     default_items = {item["id"]: item for item in default.json()["items"]}
     reverse_items = {item["id"]: item for item in reverse.json()["items"]}
+    assert default_items, "default direction returned no study items"
     assert default_items.keys() == reverse_items.keys()
+    with psycopg.connect(database_url) as conn:
+        seeded = {
+            row[0]: {"target_text": row[1], "translation": row[2]}
+            for row in conn.execute(
+                """
+                SELECT c.id, c.target_text, ct.translation
+                  FROM content_items c
+                  JOIN content_translations ct ON ct.content_id = c.id
+                  JOIN languages ml
+                    ON ml.id = ct.meta_language_id AND ml.code = 'eng'
+                 WHERE c.id = ANY(%s)
+                """,
+                (list(default_items),),
+            )
+        }
+    assert seeded.keys() == default_items.keys()
     for item_id, item in default_items.items():
         assert item["meta_language"] == "nld"
         assert item["meta_language_used"] == "eng"
-        assert item["prompt"] == reverse_items[item_id]["answer"]
-        assert item["answer"] == reverse_items[item_id]["prompt"]
+        assert item["prompt"] == seeded[item_id]["target_text"]
+        assert item["answer"] == seeded[item_id]["translation"]
+        assert reverse_items[item_id]["prompt"] == seeded[item_id]["translation"]
+        assert reverse_items[item_id]["answer"] == seeded[item_id]["target_text"]
 
 
 async def test_quiz_session_has_four_distinct_options_with_one_correct(client):
@@ -525,12 +561,7 @@ async def test_quiz_session_has_four_distinct_options_with_one_correct(client):
     body = r.json()
     assert body["mode"] == "quiz"
     for item in body["items"]:
-        opts = item["options"]
-        assert len(opts) == 4
-        assert len({o["text"] for o in opts}) == 4, "duplicate options"
-        correct = [o for o in opts if o["is_correct"]]
-        assert len(correct) == 1
-        assert correct[0]["text"] == item["answer"]
+        assert_well_formed_quiz_options(item)
 
 
 async def test_quiz_options_follow_answer_side_and_each_rows_fallback_language(
@@ -600,6 +631,8 @@ async def test_quiz_options_follow_answer_side_and_each_rows_fallback_language(
 
         translated_items = {item["id"]: item for item in translated.json()["items"]}
         target_items = {item["id"]: item for item in target.json()["items"]}
+        assert translated_items, "translated-answer quiz returned no items"
+        assert translated_items.keys() == target_items.keys()
         assert translated_items[selected_id]["meta_language_used"] == "nld"
         assert all(
             item["meta_language_used"] == "eng"
@@ -608,8 +641,8 @@ async def test_quiz_options_follow_answer_side_and_each_rows_fallback_language(
         )
 
         for item_id, item in translated_items.items():
+            assert_well_formed_quiz_options(item)
             option_texts = {option["text"] for option in item["options"]}
-            assert item["answer"] in option_texts
             if item["meta_language_used"] == "nld":
                 assert item["answer"] == f"NL quiz {item_id}"
                 assert all(text.startswith("NL quiz ") for text in option_texts)
@@ -617,8 +650,8 @@ async def test_quiz_options_follow_answer_side_and_each_rows_fallback_language(
                 assert option_texts <= english_texts
 
         for item in target_items.values():
+            assert_well_formed_quiz_options(item)
             option_texts = {option["text"] for option in item["options"]}
-            assert item["answer"] in option_texts
             assert option_texts <= target_texts
 
 
