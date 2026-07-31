@@ -677,6 +677,24 @@ async def test_shuffle_seed_is_reproducible(client):
     assert [i["id"] for i in a.json()["items"]] == [i["id"] for i in b.json()["items"]]
 
 
+async def test_quiz_shuffle_seed_reproduces_item_and_option_order(client):
+    path = "/v1/tracks/ibo_foundations/units/2/items"
+    params = {
+        "meta_language": "nld",
+        "direction": "target_to_meta",
+        "shuffle_seed": 42,
+    }
+    first = await client.get(path, params=params)
+    second = await client.get(path, params=params)
+    assert first.status_code == second.status_code == 200
+
+    first_items = first.json()["items"]
+    second_items = second.json()["items"]
+    assert first_items, "seeded quiz returned no items"
+    assert [item["id"] for item in first_items] == [item["id"] for item in second_items]
+    assert [item["options"] for item in first_items] == [item["options"] for item in second_items]
+
+
 async def test_unknown_unit_is_404(client):
     assert (await client.get("/v1/tracks/ibo_foundations/units/99/items")).status_code == 404
     assert (await client.get("/v1/tracks/nope/units/1/items")).status_code == 404
