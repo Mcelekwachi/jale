@@ -51,7 +51,7 @@ def select_content_rows(
 ) -> list[tuple]:
     with psycopg.connect(database_url) as conn:
         rows = conn.execute(
-            f"""  # noqa: S608 - the predicate is test-owned, never user input
+            f"""
             SELECT c.id, c.target_text, ct.translation,
                    ct.literal_translation, ct.cultural_note
               FROM content_items c
