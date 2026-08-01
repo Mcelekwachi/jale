@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import hashlib
+import hmac
+import json
 import re
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 
-import jwt
 import psycopg
 import pytest
 from fastapi import Depends, FastAPI
@@ -105,10 +108,19 @@ async def test_empty_configured_secret_fails_closed_with_generic_401(monkeypatch
     claims = {
         "sub": str(uuid.uuid4()),
         "aud": "authenticated",
-        "exp": datetime.now(UTC) + timedelta(minutes=5),
+        "exp": int((datetime.now(UTC) + timedelta(minutes=5)).timestamp()),
         "email": "empty-secret@example.test",
     }
-    token = jwt.encode(claims, "", algorithm="HS256")
+
+    def base64url_json(value: dict[str, object]) -> str:
+        encoded = json.dumps(value, separators=(",", ":")).encode()
+        return base64.urlsafe_b64encode(encoded).rstrip(b"=").decode()
+
+    signing_input = ".".join(
+        (base64url_json({"alg": "HS256", "typ": "JWT"}), base64url_json(claims))
+    )
+    signature = hmac.new(b"", signing_input.encode(), hashlib.sha256).digest()
+    token = f"{signing_input}.{base64.urlsafe_b64encode(signature).rstrip(b'=').decode()}"
 
     try:
         with monkeypatch.context() as auth_env:
