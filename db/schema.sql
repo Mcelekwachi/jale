@@ -299,6 +299,16 @@ CREATE TABLE user_progress (
 );
 CREATE INDEX user_progress_due_idx ON user_progress (user_id, due_at);
 
+-- Immutable client-generated answer claims make retries safe.  The content
+-- reference deliberately keeps the original item identity for conflict checks.
+CREATE TABLE study_answer_receipts (
+  user_id          UUID NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  client_answer_id TEXT NOT NULL,
+  content_id       BIGINT NOT NULL REFERENCES content_items(id) ON DELETE CASCADE,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, client_answer_id)
+);
+
 -- Source of truth for the streak. One row per active day.
 CREATE TABLE user_daily_activity (
   user_id         UUID NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,

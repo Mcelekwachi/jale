@@ -3,7 +3,7 @@ value fails loudly here rather than reaching the React client."""
 
 from __future__ import annotations
 
-from datetime import datetime, time
+from datetime import date, datetime, time
 from enum import Enum
 from typing import Any, Literal
 from uuid import UUID
@@ -196,6 +196,48 @@ class StudySession(BaseModel):
     unit_title: str
     mode: StudyMode
     items: list[StudyItem]
+
+
+class StudyAnswer(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    content_id: int
+    correct: bool
+    mode: StudyMode
+    duration_ms: int | None = None
+    client_answer_id: str | None = None
+
+
+class StudyAnswersRequest(BaseModel):
+    answers: list[StudyAnswer] = Field(max_length=100)
+
+
+class StudyAnswerResult(BaseModel):
+    content_id: int
+    client_answer_id: str | None
+    status: Literal["accepted", "duplicate", "unknown_content", "id_conflict"]
+    leitner_box: int | None
+    due_at: datetime | None
+    mastered: bool
+
+
+class StudyAnswersResponse(BaseModel):
+    results: list[StudyAnswerResult]
+    accepted_count: int
+    skipped_count: int
+    current_streak: int
+    today_xp: int
+
+
+class UserStats(BaseModel):
+    current_streak: int
+    longest_streak: int
+    total_items_seen: int
+    total_mastered: int
+    total_xp: int
+    today_items_reviewed: int
+    today_goal_met: bool
+    activity_dates: list[date]
 
 
 class UserPreferences(BaseModel):

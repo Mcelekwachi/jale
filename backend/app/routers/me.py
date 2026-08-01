@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -11,10 +12,12 @@ from app.schemas import (
     ResolvedTrack,
     SkipOnboarding,
     UserProfile,
+    UserStats,
     patch_values,
 )
 from app.services import track_resolver
 from app.services.meta_languages import validate_meta_language_id
+from app.services.study_progress import get_stats, get_utc_now
 from app.services.users import (
     complete_onboarding,
     get_user_profile,
@@ -33,6 +36,14 @@ def _user_id(user: dict) -> UUID:
 @router.get("", response_model=UserProfile)
 async def read_me(user: Annotated[dict, Depends(current_user)]) -> dict:
     return await get_user_profile(_user_id(user))
+
+
+@router.get("/stats", response_model=UserStats)
+async def read_stats(
+    user: Annotated[dict, Depends(current_user)],
+    now: Annotated[datetime, Depends(get_utc_now)],
+) -> dict:
+    return await get_stats(_user_id(user), now)
 
 
 @router.get("/track", response_model=ResolvedTrack)
