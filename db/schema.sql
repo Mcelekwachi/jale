@@ -212,6 +212,7 @@ CREATE TABLE contributor_permissions (
 CREATE TABLE user_preferences (
   user_id             UUID PRIMARY KEY REFERENCES app_users(id) ON DELETE CASCADE,
   active_language_id  SMALLINT REFERENCES languages(id),
+  meta_language_id    SMALLINT REFERENCES languages(id),
   active_dialect_id   SMALLINT REFERENCES dialects(id),
 
   age_band            age_band,

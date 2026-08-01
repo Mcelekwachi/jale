@@ -31,10 +31,20 @@ services:
         value: ibo
       - key: DEFAULT_META_LANGUAGE
         value: eng
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: SUPABASE_PROJECT_URL
+        sync: false
+      - key: SUPABASE_JWT_AUDIENCE
+        value: authenticated
       - key: CORS_ORIGINS
         sync: false            # set to your Vercel URLs in the dashboard
       - key: WEB_CONCURRENCY
         value: "2"
+      - key: DB_POOL_MIN
+        value: "1"
+      - key: DB_POOL_MAX
+        value: "5"
       # First deploy: set both to true so the container builds and seeds the
       # database itself. They are idempotent and advisory-locked, so leaving
       # them on is safe — turn them off once you move to real migrations.

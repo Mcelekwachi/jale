@@ -5,6 +5,17 @@ from fastapi import HTTPException
 from app.db import fetch_one
 
 
+async def validate_meta_language_id(language_id: int) -> int:
+    """Return an id only when it identifies a configured meta language."""
+    language = await fetch_one(
+        "SELECT id FROM languages WHERE id = %(language_id)s AND is_meta",
+        {"language_id": language_id},
+    )
+    if language is None:
+        raise HTTPException(status_code=422, detail="invalid meta language id")
+    return language["id"]
+
+
 async def validate_meta_language(code: str) -> str:
     """Return *code* when it names a configured meta language."""
     language = await fetch_one(

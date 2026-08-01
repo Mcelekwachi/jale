@@ -13,8 +13,13 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import uuid
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
+import jwt
 import psycopg
 import pytest
 import pytest_asyncio
@@ -22,7 +27,59 @@ from httpx import ASGITransport, AsyncClient
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
+_TEST_JWT_SECRET = "test-supabase-secret"
+_TEST_JWT_AUDIENCE = "authenticated"
+
+# Settings are cached when the application is created, so auth configuration
+# must exist before any fixture imports app.main.
+os.environ["SUPABASE_JWT_SECRET"] = _TEST_JWT_SECRET
+os.environ["SUPABASE_JWT_AUDIENCE"] = _TEST_JWT_AUDIENCE
+os.environ["SUPABASE_PROJECT_URL"] = "https://test-project.supabase.co"
+
 pytest_plugins = ("pytest_asyncio",)
+
+
+@pytest.fixture
+def user_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
+@pytest.fixture
+def mint_token() -> Callable[..., str]:
+    def mint(
+        *,
+        subject: uuid.UUID | str | None = None,
+        audience: str = _TEST_JWT_AUDIENCE,
+        expires_at: datetime | None = None,
+        email: str | None = None,
+        user_metadata: dict[str, Any] | None = None,
+        name: str | None = None,
+        avatar_url: str | None = None,
+    ) -> str:
+        token_subject = str(subject or uuid.uuid4())
+        claims: dict[str, Any] = {
+            "sub": token_subject,
+            "aud": audience,
+            "exp": expires_at or datetime.now(UTC) + timedelta(minutes=15),
+            "email": email or f"{token_subject}@example.test",
+        }
+        if user_metadata is not None:
+            claims["user_metadata"] = user_metadata
+        if name is not None:
+            claims["name"] = name
+        if avatar_url is not None:
+            claims["avatar_url"] = avatar_url
+        return jwt.encode(claims, _TEST_JWT_SECRET, algorithm="HS256")
+
+    return mint
+
+
+@pytest.fixture
+def auth_headers(mint_token: Callable[..., str]) -> Callable[..., dict[str, str]]:
+    def headers(**claims: Any) -> dict[str, str]:
+        return {"Authorization": f"Bearer {mint_token(**claims)}"}
+
+    return headers
 
 
 @pytest.fixture(scope="session")
