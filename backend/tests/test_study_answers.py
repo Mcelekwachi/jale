@@ -399,6 +399,29 @@ async def test_unknown_and_unpublished_content_are_reported_in_order_and_skipped
     assert set(rows) == {published_id}
 
 
+async def test_content_id_beyond_signed_bigint_is_reported_as_unknown_without_writes(
+    client, database_url, user_id, auth_headers
+):
+    oversized_content_id = 10**30
+    with study_user(database_url, user_id):
+        response = await client.post(
+            "/v1/study/answers",
+            headers=auth_headers(subject=user_id),
+            json={"answers": [answer(oversized_content_id, correct=True)]},
+        )
+        rows = progress_rows(database_url, user_id)
+        activity = activity_rows(database_url, user_id)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["results"][0]["content_id"] == oversized_content_id
+    assert body["results"][0]["status"] == "unknown_content"
+    assert body["accepted_count"] == 0
+    assert body["skipped_count"] == 1
+    assert rows == {}
+    assert activity == []
+
+
 async def test_idempotency_retry_conflict_and_within_batch_classification(
     client, database_url, user_id, auth_headers
 ):
