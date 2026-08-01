@@ -38,6 +38,18 @@ def auth_row_counts(database_url: str, user_id: uuid.UUID) -> tuple[int, int, in
         ).fetchone()
 
 
+async def test_settings_allow_public_startup_without_supabase_auth_config(monkeypatch):
+    from app.config import Settings
+
+    monkeypatch.delenv("SUPABASE_JWT_SECRET", raising=False)
+    monkeypatch.delenv("SUPABASE_PROJECT_URL", raising=False)
+
+    settings = Settings()
+
+    assert settings.supabase_jwt_secret == ""
+    assert settings.supabase_project_url == ""
+
+
 @pytest.mark.parametrize(
     "headers_factory",
     [
@@ -146,6 +158,28 @@ async def test_equal_display_names_receive_distinct_url_safe_share_slugs(
         slugs = {first.json()["share_slug"], second.json()["share_slug"]}
         assert len(slugs) == 2
         assert all(re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", slug) for slug in slugs)
+
+
+async def test_top_level_identity_claims_are_used_when_metadata_is_absent(
+    client, database_url, user_id, auth_headers
+):
+    avatar_url = "https://example.test/top-level-avatar.png"
+    headers = auth_headers(
+        subject=user_id,
+        name="Top Level Name",
+        avatar_url=avatar_url,
+    )
+    with remove_test_users(database_url, user_id):
+        response = await client.get("/v1/me", headers=headers)
+
+        assert response.status_code == 200
+        assert response.json()["display_name"] == "Top Level Name"
+        assert response.json()["avatar_url"] == avatar_url
+        with psycopg.connect(database_url) as conn:
+            stored = conn.execute(
+                "SELECT display_name, avatar_url FROM app_users WHERE id = %s", (user_id,)
+            ).fetchone()
+        assert stored == ("Top Level Name", avatar_url)
 
 
 async def test_last_seen_advances_only_when_missing_or_older_than_one_hour(

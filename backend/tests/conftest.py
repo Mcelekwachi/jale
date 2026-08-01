@@ -53,6 +53,8 @@ def mint_token() -> Callable[..., str]:
         expires_at: datetime | None = None,
         email: str | None = None,
         user_metadata: dict[str, Any] | None = None,
+        name: str | None = None,
+        avatar_url: str | None = None,
     ) -> str:
         token_subject = str(subject or uuid.uuid4())
         claims: dict[str, Any] = {
@@ -63,6 +65,10 @@ def mint_token() -> Callable[..., str]:
         }
         if user_metadata is not None:
             claims["user_metadata"] = user_metadata
+        if name is not None:
+            claims["name"] = name
+        if avatar_url is not None:
+            claims["avatar_url"] = avatar_url
         return jwt.encode(claims, _TEST_JWT_SECRET, algorithm="HS256")
 
     return mint
