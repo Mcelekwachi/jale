@@ -78,6 +78,18 @@ def activity_rows(database_url: str, user_id: uuid.UUID) -> list[tuple]:
         ).fetchall()
 
 
+@contextmanager
+def fixed_utc_now(client, instant: datetime) -> Iterator[None]:
+    from app.services.study_progress import get_utc_now
+
+    app = client._transport.app
+    app.dependency_overrides[get_utc_now] = lambda: instant
+    try:
+        yield
+    finally:
+        app.dependency_overrides.pop(get_utc_now, None)
+
+
 async def provision(client, headers: dict[str, str]) -> None:
     response = await client.get("/v1/me", headers=headers)
     assert response.status_code == 200
@@ -533,28 +545,41 @@ async def test_mid_batch_database_failure_rolls_back_all_answer_side_effects(
                 )
             assert progress_rows(database_url, user_id) == {}
             assert activity_rows(database_url, user_id) == []
-            with psycopg.connect(database_url) as conn:
-                stats = conn.execute(
-                    """
-                    SELECT current_streak, longest_streak, total_items_seen,
-                           total_mastered, total_xp
-                    FROM user_stats WHERE user_id=%s
-                    """,
-                    (user_id,),
-                ).fetchone()
-                receipt_count = conn.execute(
-                    """
-                    SELECT count(*) FROM study_answer_receipts
-                    WHERE user_id=%s AND client_answer_id=ANY(%s)
-                    """,
-                    (user_id, [first_answer_id, failing_answer_id]),
-                ).fetchone()[0]
-            assert stats == (0, 0, 0, 0, 0)
-            assert receipt_count == 0
         finally:
             with psycopg.connect(database_url, autocommit=True) as conn:
                 conn.execute(f"DROP TRIGGER IF EXISTS {trigger} ON user_progress")
                 conn.execute(f"DROP FUNCTION IF EXISTS {function}()")
+
+        retry = await client.post(
+            "/v1/study/answers",
+            headers=headers,
+            json={
+                "answers": [
+                    answer(first_content, correct=True, client_answer_id=first_answer_id),
+                    answer(failing_content, correct=True, client_answer_id=failing_answer_id),
+                ]
+            },
+        )
+        assert retry.status_code == 200
+        assert retry.json()["accepted_count"] == 2
+        assert [result["status"] for result in retry.json()["results"]] == [
+            "accepted",
+            "accepted",
+        ]
+        rows = progress_rows(database_url, user_id)
+        assert rows[first_content][:3] == (1, 1, 0)
+        assert rows[failing_content][:3] == (1, 1, 0)
+        assert activity_rows(database_url, user_id)[0][1:4] == (2, 0, 20)
+        with psycopg.connect(database_url) as conn:
+            stats = conn.execute(
+                """
+                SELECT current_streak, longest_streak, total_items_seen,
+                       total_mastered, total_xp
+                FROM user_stats WHERE user_id=%s
+                """,
+                (user_id,),
+            ).fetchone()
+        assert stats == (1, 1, 2, 0, 20)
 
 
 async def test_concurrent_reversed_batches_finish_without_deadlock_and_keep_all_counts(
@@ -596,29 +621,25 @@ async def test_concurrent_reversed_batches_finish_without_deadlock_and_keep_all_
 
 
 async def test_activity_uses_each_users_local_day_for_the_same_utc_instant(
-    client, database_url, auth_headers, monkeypatch
+    client, database_url, auth_headers
 ):
-    from app.routers import study
-
-    class FrozenDateTime(datetime):
-        @classmethod
-        def now(cls, tz=None):
-            instant = cls(2026, 1, 15, 11, 30, tzinfo=UTC)
-            return instant if tz is None else instant.astimezone(tz)
-
-    monkeypatch.setattr(study, "datetime", FrozenDateTime)
+    instant = datetime(2026, 8, 1, 2, tzinfo=UTC)
     content_id = published_content_ids(database_url, 1)[0]
     auckland_user, los_angeles_user = uuid.uuid4(), uuid.uuid4()
     expected_dates = {
-        auckland_user: datetime(2026, 1, 16).date(),
-        los_angeles_user: datetime(2026, 1, 15).date(),
+        auckland_user: datetime(2026, 8, 1).date(),
+        los_angeles_user: datetime(2026, 7, 31).date(),
     }
     timezones = {
         auckland_user: "Pacific/Auckland",
         los_angeles_user: "America/Los_Angeles",
     }
 
-    with study_user(database_url, auckland_user), study_user(database_url, los_angeles_user):
+    with (
+        fixed_utc_now(client, instant),
+        study_user(database_url, auckland_user),
+        study_user(database_url, los_angeles_user),
+    ):
         for subject in (auckland_user, los_angeles_user):
             headers = auth_headers(subject=subject)
             await provision(client, headers)
@@ -640,19 +661,26 @@ async def test_activity_uses_each_users_local_day_for_the_same_utc_instant(
 async def test_streak_same_day_consecutive_day_and_gap_updates_once_per_batch(
     client, database_url, user_id, auth_headers
 ):
+    instant = datetime(2026, 8, 1, 2, tzinfo=UTC)
+    local_today = datetime(2026, 7, 31).date()
     content_id = published_content_ids(database_url, 1)[0]
     headers = auth_headers(subject=user_id)
-    with study_user(database_url, user_id):
+    with fixed_utc_now(client, instant), study_user(database_url, user_id):
         await provision(client, headers)
+        patched = await client.patch(
+            "/v1/me/preferences",
+            headers=headers,
+            json={"timezone": "America/Los_Angeles"},
+        )
+        assert patched.status_code == 200
         with psycopg.connect(database_url, autocommit=True) as conn:
-            today = conn.execute("SELECT CURRENT_DATE").fetchone()[0]
             conn.execute(
                 """
                 UPDATE user_stats
                    SET current_streak = 2, longest_streak = 5, last_activity_date = %s
                  WHERE user_id = %s
                 """,
-                (today - timedelta(days=1), user_id),
+                (local_today - timedelta(days=1), user_id),
             )
         consecutive = await client.post(
             "/v1/study/answers",
@@ -667,7 +695,7 @@ async def test_streak_same_day_consecutive_day_and_gap_updates_once_per_batch(
         with psycopg.connect(database_url, autocommit=True) as conn:
             conn.execute(
                 "UPDATE user_stats SET last_activity_date = %s WHERE user_id = %s",
-                (today - timedelta(days=3), user_id),
+                (local_today - timedelta(days=3), user_id),
             )
             conn.execute("DELETE FROM user_daily_activity WHERE user_id = %s", (user_id,))
         gap = await client.post(
@@ -743,16 +771,31 @@ async def test_null_daily_goal_is_met_by_any_accepted_activity(
         assert activity_rows(database_url, user_id)[0][4] is True
 
 
-async def test_me_stats_requires_auth_and_returns_totals_today_and_last_30_dates(
-    client, database_url, user_id, auth_headers
+@pytest.mark.parametrize(
+    ("timezone", "local_today"),
+    [
+        ("Pacific/Auckland", datetime(2026, 8, 1).date()),
+        ("America/Los_Angeles", datetime(2026, 7, 31).date()),
+    ],
+)
+async def test_me_stats_uses_local_today_for_totals_and_last_30_dates(
+    client, database_url, user_id, auth_headers, timezone, local_today
 ):
     assert (await client.get("/v1/me/stats")).status_code == 401
+    instant = datetime(2026, 8, 1, 2, tzinfo=UTC)
     headers = auth_headers(subject=user_id)
-    with study_user(database_url, user_id):
+    with fixed_utc_now(client, instant), study_user(database_url, user_id):
         await provision(client, headers)
+        patched = await client.patch(
+            "/v1/me/preferences", headers=headers, json={"timezone": timezone}
+        )
+        assert patched.status_code == 200
         with psycopg.connect(database_url, autocommit=True) as conn:
-            today = conn.execute("SELECT CURRENT_DATE").fetchone()[0]
-            dates = [today - timedelta(days=31), today - timedelta(days=29), today]
+            dates = [
+                local_today - timedelta(days=30),
+                local_today - timedelta(days=29),
+                local_today,
+            ]
             conn.execute(
                 """
                 UPDATE user_stats
@@ -760,7 +803,7 @@ async def test_me_stats_requires_auth_and_returns_totals_today_and_last_30_dates
                        total_mastered = 3, total_xp = 90, last_activity_date = %s
                  WHERE user_id = %s
                 """,
-                (today, user_id),
+                (local_today, user_id),
             )
             conn.executemany(
                 """
@@ -769,7 +812,7 @@ async def test_me_stats_requires_auth_and_returns_totals_today_and_last_30_dates
                 VALUES (%s, %s, %s, %s, %s, %s)
                 """,
                 [
-                    (user_id, day, index + 1, 60, 10, day == today)
+                    (user_id, day, index + 1, 60, 10, day == local_today)
                     for index, day in enumerate(dates)
                 ],
             )
