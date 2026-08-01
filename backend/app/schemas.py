@@ -40,6 +40,15 @@ class StudyDirection(str, Enum):
     meta_to_target = "meta_to_target"
 
 
+class FlagReason(str, Enum):
+    bad_audio = "bad_audio"
+    wrong_translation = "wrong_translation"
+    cultural_inaccuracy = "cultural_inaccuracy"
+    spelling_or_tone = "spelling_or_tone"
+    offensive = "offensive"
+    other = "other"
+
+
 class AgeBand(str, Enum):
     child_u13 = "child_u13"
     young_adult_13_25 = "young_adult_13_25"
@@ -125,6 +134,28 @@ class ContentPage(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class ContentFlagCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: FlagReason
+    note: str | None = None
+    meta_language: str | None = None
+
+
+class ContentFlag(BaseModel):
+    id: int
+    content_id: int
+    reason: FlagReason
+    note: str | None
+    meta_language: str | None
+    status: str
+    created_at: datetime
+
+
+class ContentFlagDelete(BaseModel):
+    deleted: bool
 
 
 class TrackUnit(BaseModel):

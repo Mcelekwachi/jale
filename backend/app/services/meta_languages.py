@@ -16,6 +16,17 @@ async def validate_meta_language_id(language_id: int) -> int:
     return language["id"]
 
 
+async def resolve_meta_language_id(code: str) -> int:
+    """Resolve a configured meta-language code for write endpoints."""
+    language = await fetch_one(
+        "SELECT id FROM languages WHERE code = %(code)s AND is_meta",
+        {"code": code},
+    )
+    if language is None:
+        raise HTTPException(status_code=422, detail=f"invalid meta language {code!r}")
+    return language["id"]
+
+
 async def validate_meta_language(code: str) -> str:
     """Return *code* when it names a configured meta language."""
     language = await fetch_one(
