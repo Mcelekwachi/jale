@@ -632,3 +632,49 @@ async def test_terminal_onboarding_states_cannot_overwrite_each_other(
         assert skipped_preferences["onboarding_status"] == "skipped"
         assert skipped_preferences["onboarding_last_screen"] == 5
         assert skipped_preferences["completed_at"] is None
+
+
+async def test_new_user_authenticated_track_resolves_default_foundations(
+    client, database_url, user_id, auth_headers
+):
+    with remove_test_users(database_url, user_id):
+        response = await client.get("/v1/me/track", headers=auth_headers(subject=user_id))
+
+        assert response.status_code == 200
+        resolved = response.json()
+        assert resolved["track"]["slug"] == "ibo_foundations"
+        assert resolved["track"]["units"]
+        assert "matched_priority" in resolved
+        assert resolved["is_fallback"] is True
+
+
+async def test_authenticated_track_uses_only_token_owners_stored_preferences(
+    client, database_url, auth_headers
+):
+    native_id, other_id = uuid.uuid4(), uuid.uuid4()
+    native_headers = auth_headers(subject=native_id)
+    other_headers = auth_headers(subject=other_id)
+    with remove_test_users(database_url, native_id, other_id):
+        assert (await client.get("/v1/me", headers=other_headers)).status_code == 200
+        patched = await client.patch(
+            "/v1/me/preferences",
+            headers=native_headers,
+            json={"connection": "aboriginal_native"},
+        )
+        assert patched.status_code == 200
+
+        authenticated = await client.get(
+            "/v1/me/track",
+            headers=native_headers,
+            params={"user_id": str(other_id)},
+        )
+        public = await client.get("/v1/tracks/resolve", params={"connection": "aboriginal_native"})
+        other = await client.get("/v1/me/track", headers=other_headers)
+
+        assert authenticated.status_code == public.status_code == other.status_code == 200
+        assert authenticated.json() == public.json()
+        assert authenticated.json()["track"]["slug"] == "ibo_native_advanced"
+        assert authenticated.json()["track"]["units"]
+        assert "matched_priority" in authenticated.json()
+        assert authenticated.json()["is_fallback"] is False
+        assert other.json()["track"]["slug"] == "ibo_foundations"
