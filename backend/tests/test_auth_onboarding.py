@@ -573,6 +573,30 @@ async def test_skip_with_explicit_null_clears_existing_screen(
         assert preferences["onboarding_last_screen"] is None
 
 
+async def test_repeated_skip_is_idempotent_and_preserves_first_terminal_screen(
+    client, database_url, user_id, auth_headers
+):
+    headers = auth_headers(subject=user_id)
+    with remove_test_users(database_url, user_id):
+        first = await client.post(
+            "/v1/me/onboarding/skip",
+            headers=headers,
+            json={"onboarding_last_screen": 5},
+        )
+        repeated = await client.post(
+            "/v1/me/onboarding/skip",
+            headers=headers,
+            json={"onboarding_last_screen": 2},
+        )
+
+        assert first.status_code == repeated.status_code == 200
+        assert first.json()["preferences"]["onboarding_status"] == "skipped"
+        assert first.json()["preferences"]["onboarding_last_screen"] == 5
+        repeated_preferences = repeated.json()["preferences"]
+        assert repeated_preferences["onboarding_status"] == "skipped"
+        assert repeated_preferences["onboarding_last_screen"] == 5
+
+
 async def test_terminal_onboarding_states_cannot_overwrite_each_other(
     client, database_url, auth_headers
 ):
