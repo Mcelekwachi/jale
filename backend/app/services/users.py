@@ -28,11 +28,15 @@ async def provision_user(claims: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(display_name, str) or not display_name.strip():
         display_name = metadata.get("name")
     if not isinstance(display_name, str) or not display_name.strip():
+        display_name = claims.get("name")
+    if not isinstance(display_name, str) or not display_name.strip():
         display_name = None
     if not display_name and isinstance(email, str):
         display_name = email.partition("@")[0]
     display_name = (display_name or "Learner")[:100]
     avatar_url = metadata.get("avatar_url")
+    if not isinstance(avatar_url, str):
+        avatar_url = claims.get("avatar_url")
     if not isinstance(avatar_url, str):
         avatar_url = metadata.get("picture")
     if not isinstance(avatar_url, str):
@@ -58,8 +62,11 @@ async def provision_user(claims: dict[str, Any]) -> dict[str, Any]:
             slug = f"{_slug_base(display_name)}-{secrets.token_hex(3)}"
             inserted_cursor = await conn.execute(
                 """
-                INSERT INTO app_users (id, email, display_name, avatar_url, share_slug, last_seen_at)
-                VALUES (%(id)s, %(email)s, %(display_name)s, %(avatar_url)s, %(slug)s, now())
+                INSERT INTO app_users
+                    (id, email, display_name, avatar_url, role, share_slug, last_seen_at)
+                VALUES
+                    (%(id)s, %(email)s, %(display_name)s, %(avatar_url)s,
+                     'learner', %(slug)s, now())
                 ON CONFLICT DO NOTHING
                 RETURNING id
                 """,
@@ -85,8 +92,8 @@ async def provision_user(claims: dict[str, Any]) -> dict[str, Any]:
         )
         await conn.execute(
             """
-            INSERT INTO user_preferences (user_id, active_language_id, meta_language_id)
-            VALUES (%(id)s, %(language_id)s, NULL)
+            INSERT INTO user_preferences (user_id, active_language_id)
+            VALUES (%(id)s, %(language_id)s)
             ON CONFLICT DO NOTHING
             """,
             {"id": user_id, "language_id": language["id"]},

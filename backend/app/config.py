@@ -13,8 +13,8 @@ class Settings:
         self.database_url: str = os.getenv("DATABASE_URL", "")
         self.default_language: str = os.getenv("DEFAULT_LANGUAGE", "ibo")
         self.default_meta_language: str = os.getenv("DEFAULT_META_LANGUAGE", "eng")
-        self.supabase_jwt_secret: str = os.environ["SUPABASE_JWT_SECRET"]
-        self.supabase_project_url: str = os.environ["SUPABASE_PROJECT_URL"]
+        self.supabase_jwt_secret: str = os.getenv("SUPABASE_JWT_SECRET", "")
+        self.supabase_project_url: str = os.getenv("SUPABASE_PROJECT_URL", "")
         self.supabase_jwt_audience: str = os.getenv("SUPABASE_JWT_AUDIENCE", "authenticated")
 
         # Vercel preview deployments get their own URL per branch, so the
