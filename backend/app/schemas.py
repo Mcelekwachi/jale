@@ -309,6 +309,15 @@ class UserProfile(BaseModel):
     preferences: UserPreferences
 
 
+class PublicProfile(BaseModel):
+    display_name: str | None
+    current_streak: int
+    longest_streak: int
+    total_mastered: int
+    language: str
+    joined_month: str = Field(pattern=r"^\d{4}-\d{2}$")
+
+
 class PreferencesPatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
