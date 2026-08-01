@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 
 import psycopg
 import pytest
+from psycopg import sql
 
 pytestmark = pytest.mark.asyncio
 
@@ -83,11 +84,29 @@ def fixed_utc_now(client, instant: datetime) -> Iterator[None]:
     from app.services.study_progress import get_utc_now
 
     app = client._transport.app
+    missing = object()
+    previous = app.dependency_overrides.get(get_utc_now, missing)
     app.dependency_overrides[get_utc_now] = lambda: instant
     try:
         yield
     finally:
-        app.dependency_overrides.pop(get_utc_now, None)
+        if previous is missing:
+            app.dependency_overrides.pop(get_utc_now, None)
+        else:
+            app.dependency_overrides[get_utc_now] = previous
+
+
+def drop_progress_trigger(database_url: str, trigger: str, function: str) -> None:
+    try:
+        with psycopg.connect(database_url, autocommit=True) as conn:
+            conn.execute(
+                sql.SQL("DROP TRIGGER IF EXISTS {} ON user_progress").format(
+                    sql.Identifier(trigger)
+                )
+            )
+    finally:
+        with psycopg.connect(database_url, autocommit=True) as conn:
+            conn.execute(sql.SQL("DROP FUNCTION IF EXISTS {}()").format(sql.Identifier(function)))
 
 
 async def provision(client, headers: dict[str, str]) -> None:
@@ -147,11 +166,12 @@ async def test_batch_size_accepts_one_and_one_hundred_but_rejects_more_than_one_
 
 
 async def test_empty_batch_is_a_read_only_no_op(client, database_url, user_id, auth_headers):
+    instant = datetime(2026, 8, 1, 2, tzinfo=UTC)
+    activity_date = datetime(2026, 8, 1).date()
     headers = auth_headers(subject=user_id)
-    with study_user(database_url, user_id):
+    with fixed_utc_now(client, instant), study_user(database_url, user_id):
         await provision(client, headers)
         with psycopg.connect(database_url, autocommit=True) as conn:
-            today = conn.execute("SELECT CURRENT_DATE").fetchone()[0]
             conn.execute(
                 """
                 UPDATE user_stats
@@ -167,7 +187,7 @@ async def test_empty_batch_is_a_read_only_no_op(client, database_url, user_id, a
                     (user_id, activity_date, items_reviewed, seconds_spent, xp, goal_met)
                 VALUES (%s, %s, 3, 90, 34, false)
                 """,
-                (user_id, today),
+                (user_id, activity_date),
             )
 
         before_activity = activity_rows(database_url, user_id)
@@ -511,23 +531,32 @@ async def test_mid_batch_database_failure_rolls_back_all_answer_side_effects(
     first_answer_id, failing_answer_id = uuid.uuid4(), uuid.uuid4()
     with study_user(database_url, user_id):
         await provision(client, headers)
-        with psycopg.connect(database_url, autocommit=True) as conn:
-            conn.execute(
-                f"""
-                CREATE FUNCTION {function}() RETURNS trigger LANGUAGE plpgsql AS $$
-                BEGIN
-                  IF NEW.content_id = {failing_content} THEN
-                    RAISE EXCEPTION 'deliberate study batch failure';
-                  END IF;
-                  RETURN NEW;
-                END $$
-                """
-            )
-            conn.execute(
-                f"CREATE TRIGGER {trigger} BEFORE INSERT OR UPDATE ON user_progress "
-                f"FOR EACH ROW EXECUTE FUNCTION {function}()"
-            )
         try:
+            with psycopg.connect(database_url, autocommit=True) as conn:
+                conn.execute(
+                    sql.SQL(
+                        """
+                    CREATE FUNCTION {}() RETURNS trigger LANGUAGE plpgsql AS $$
+                    BEGIN
+                      IF NEW.user_id = {}
+                         AND NEW.content_id = {} THEN
+                        RAISE EXCEPTION 'deliberate study batch failure';
+                      END IF;
+                      RETURN NEW;
+                    END $$
+                    """
+                    ).format(
+                        sql.Identifier(function),
+                        sql.Literal(user_id),
+                        sql.Literal(failing_content),
+                    )
+                )
+                conn.execute(
+                    sql.SQL(
+                        "CREATE TRIGGER {} BEFORE INSERT OR UPDATE ON user_progress "
+                        "FOR EACH ROW EXECUTE FUNCTION {}()"
+                    ).format(sql.Identifier(trigger), sql.Identifier(function))
+                )
             try:
                 failed_response = await client.post(
                     "/v1/study/answers",
@@ -550,9 +579,7 @@ async def test_mid_batch_database_failure_rolls_back_all_answer_side_effects(
             assert progress_rows(database_url, user_id) == {}
             assert activity_rows(database_url, user_id) == []
         finally:
-            with psycopg.connect(database_url, autocommit=True) as conn:
-                conn.execute(f"DROP TRIGGER IF EXISTS {trigger} ON user_progress")
-                conn.execute(f"DROP FUNCTION IF EXISTS {function}()")
+            drop_progress_trigger(database_url, trigger, function)
 
         retry = await client.post(
             "/v1/study/answers",
@@ -591,32 +618,57 @@ async def test_concurrent_reversed_batches_finish_without_deadlock_and_keep_all_
 ):
     first_content, second_content = published_content_ids(database_url, 2)
     headers = auth_headers(subject=user_id)
+    trigger = f"delay_study_batch_{uuid.uuid4().hex}"
+    function = f"{trigger}_fn"
     with study_user(database_url, user_id):
-        responses = await asyncio.wait_for(
-            asyncio.gather(
-                client.post(
-                    "/v1/study/answers",
-                    headers=headers,
-                    json={
-                        "answers": [
-                            answer(first_content, correct=True),
-                            answer(second_content, correct=False),
-                        ]
-                    },
+        try:
+            with psycopg.connect(database_url, autocommit=True) as conn:
+                conn.execute(
+                    sql.SQL(
+                        """
+                    CREATE FUNCTION {}() RETURNS trigger LANGUAGE plpgsql AS $$
+                    BEGIN
+                      IF NEW.user_id = {} THEN
+                        PERFORM pg_sleep(0.2);
+                      END IF;
+                      RETURN NEW;
+                    END $$
+                    """
+                    ).format(sql.Identifier(function), sql.Literal(user_id))
+                )
+                conn.execute(
+                    sql.SQL(
+                        "CREATE TRIGGER {} BEFORE INSERT OR UPDATE ON user_progress "
+                        "FOR EACH ROW EXECUTE FUNCTION {}()"
+                    ).format(sql.Identifier(trigger), sql.Identifier(function))
+                )
+            responses = await asyncio.wait_for(
+                asyncio.gather(
+                    client.post(
+                        "/v1/study/answers",
+                        headers=headers,
+                        json={
+                            "answers": [
+                                answer(first_content, correct=True),
+                                answer(second_content, correct=False),
+                            ]
+                        },
+                    ),
+                    client.post(
+                        "/v1/study/answers",
+                        headers=headers,
+                        json={
+                            "answers": [
+                                answer(second_content, correct=True),
+                                answer(first_content, correct=False),
+                            ]
+                        },
+                    ),
                 ),
-                client.post(
-                    "/v1/study/answers",
-                    headers=headers,
-                    json={
-                        "answers": [
-                            answer(second_content, correct=True),
-                            answer(first_content, correct=False),
-                        ]
-                    },
-                ),
-            ),
-            timeout=10,
-        )
+                timeout=10,
+            )
+        finally:
+            drop_progress_trigger(database_url, trigger, function)
         assert [response.status_code for response in responses] == [200, 200]
         rows = progress_rows(database_url, user_id)
         assert rows[first_content][:3] == (2, 1, 1)
