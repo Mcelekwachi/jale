@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import psycopg
 import pytest
@@ -138,6 +139,7 @@ async def test_empty_batch_is_a_read_only_no_op(client, database_url, user_id, a
     with study_user(database_url, user_id):
         await provision(client, headers)
         with psycopg.connect(database_url, autocommit=True) as conn:
+            today = conn.execute("SELECT CURRENT_DATE").fetchone()[0]
             conn.execute(
                 """
                 UPDATE user_stats
@@ -147,18 +149,26 @@ async def test_empty_batch_is_a_read_only_no_op(client, database_url, user_id, a
                 """,
                 (user_id,),
             )
+            conn.execute(
+                """
+                INSERT INTO user_daily_activity
+                    (user_id, activity_date, items_reviewed, seconds_spent, xp, goal_met)
+                VALUES (%s, %s, 3, 90, 34, false)
+                """,
+                (user_id, today),
+            )
+
+        before_activity = activity_rows(database_url, user_id)
 
         response = await client.post("/v1/study/answers", headers=headers, json={"answers": []})
 
         assert response.status_code == 200
-        assert response.json() == {
-            "results": [],
-            "accepted_count": 0,
-            "skipped_count": 0,
-            "current_streak": 4,
-            "today_xp": 0,
-        }
-        assert activity_rows(database_url, user_id) == []
+        assert response.json()["results"] == []
+        assert response.json()["accepted_count"] == 0
+        assert response.json()["skipped_count"] == 0
+        assert response.json()["current_streak"] == 4
+        assert response.json()["today_xp"] == 34
+        assert activity_rows(database_url, user_id) == before_activity
         with psycopg.connect(database_url) as conn:
             stats = conn.execute(
                 """
@@ -346,6 +356,7 @@ async def test_unknown_and_unpublished_content_are_reported_in_order_and_skipped
     assert response.status_code == 200
     body = response.json()
     assert [result["content_id"] for result in body["results"]] == submitted_ids
+    assert all(result["client_answer_id"] is None for result in body["results"])
     assert [result["status"] for result in body["results"]] == [
         "unknown_content",
         "accepted",
@@ -366,6 +377,11 @@ async def test_idempotency_retry_conflict_and_within_batch_classification(
     with study_user(database_url, user_id):
         accepted = await client.post(
             "/v1/study/answers", headers=headers, json={"answers": [first]}
+        )
+        advanced = await client.post(
+            "/v1/study/answers",
+            headers=headers,
+            json={"answers": [answer(first_content, correct=True)]},
         )
         duplicate = await client.post(
             "/v1/study/answers", headers=headers, json={"answers": [first]}
@@ -400,20 +416,225 @@ async def test_idempotency_retry_conflict_and_within_batch_classification(
     duplicate_result = duplicate.json()["results"][0]
     assert duplicate_result["status"] == "duplicate"
     for field in ("leitner_box", "due_at", "mastered"):
-        assert duplicate_result[field] == accepted.json()["results"][0][field]
+        assert duplicate_result[field] == advanced.json()["results"][0][field]
+    assert duplicate_result["content_id"] == first_content
+    assert duplicate_result["client_answer_id"] == str(answer_id)
     conflict_result = conflict.json()["results"][0]
     assert conflict_result["status"] == "id_conflict"
     assert conflict_result["leitner_box"] is None
     assert conflict_result["due_at"] is None
-    assert conflict_result["mastered"] is None
+    assert conflict_result["mastered"] is False
+    assert conflict_result["content_id"] == second_content
+    assert conflict_result["client_answer_id"] == str(answer_id)
     assert [result["status"] for result in mixed.json()["results"]] == [
         "accepted",
         "duplicate",
         "id_conflict",
     ]
-    assert rows[first_content][:4] == (1, 1, 0, 1)
+    assert [result["content_id"] for result in mixed.json()["results"]] == [
+        second_content,
+        second_content,
+        first_content,
+    ]
+    assert [result["client_answer_id"] for result in mixed.json()["results"]] == [
+        str(batch_id),
+        str(batch_id),
+        str(batch_id),
+    ]
+    assert rows[first_content][:4] == (2, 2, 0, 2)
     assert rows[second_content][:4] == (1, 0, 1, 0)
-    assert activity[0][1:4] == (2, 1, 12)
+    assert activity[0][1:4] == (3, 1, 22)
+
+
+@pytest.mark.parametrize("kind", ["unknown", "duplicate"])
+async def test_batches_without_accepted_answers_do_not_touch_activity_or_streak(
+    client, database_url, user_id, auth_headers, kind
+):
+    content_id = published_content_ids(database_url, 1)[0]
+    headers = auth_headers(subject=user_id)
+    answer_id = uuid.uuid4()
+    with study_user(database_url, user_id):
+        await provision(client, headers)
+        with psycopg.connect(database_url, autocommit=True) as conn:
+            conn.execute(
+                "UPDATE user_stats SET current_streak=6, longest_streak=8 WHERE user_id=%s",
+                (user_id,),
+            )
+        if kind == "duplicate":
+            original = answer(content_id, correct=True, client_answer_id=answer_id)
+            first = await client.post(
+                "/v1/study/answers",
+                headers=headers,
+                json={"answers": [original]},
+            )
+            assert first.status_code == 200
+            with psycopg.connect(database_url, autocommit=True) as conn:
+                conn.execute(
+                    "UPDATE user_stats SET current_streak=6, longest_streak=8 WHERE user_id=%s",
+                    (user_id,),
+                )
+            before_activity = activity_rows(database_url, user_id)
+            submitted = original
+        else:
+            before_activity = []
+            submitted = answer(9_223_372_036_854_775_000, correct=True)
+
+        response = await client.post(
+            "/v1/study/answers", headers=headers, json={"answers": [submitted]}
+        )
+
+        assert response.status_code == 200
+        assert response.json()["accepted_count"] == 0
+        assert response.json()["current_streak"] == 6
+        assert activity_rows(database_url, user_id) == before_activity
+
+
+async def test_mid_batch_database_failure_rolls_back_all_answer_side_effects(
+    client, database_url, user_id, auth_headers
+):
+    first_content, failing_content = published_content_ids(database_url, 2)
+    headers = auth_headers(subject=user_id)
+    trigger = f"fail_study_batch_{uuid.uuid4().hex}"
+    function = f"{trigger}_fn"
+    first_answer_id, failing_answer_id = uuid.uuid4(), uuid.uuid4()
+    with study_user(database_url, user_id):
+        await provision(client, headers)
+        with psycopg.connect(database_url, autocommit=True) as conn:
+            conn.execute(
+                f"""
+                CREATE FUNCTION {function}() RETURNS trigger LANGUAGE plpgsql AS $$
+                BEGIN
+                  IF NEW.content_id = {failing_content} THEN
+                    RAISE EXCEPTION 'deliberate study batch failure';
+                  END IF;
+                  RETURN NEW;
+                END $$
+                """
+            )
+            conn.execute(
+                f"CREATE TRIGGER {trigger} BEFORE INSERT OR UPDATE ON user_progress "
+                f"FOR EACH ROW EXECUTE FUNCTION {function}()"
+            )
+        try:
+            with pytest.raises(psycopg.DatabaseError, match="deliberate study batch failure"):
+                await client.post(
+                    "/v1/study/answers",
+                    headers=headers,
+                    json={
+                        "answers": [
+                            answer(first_content, correct=True, client_answer_id=first_answer_id),
+                            answer(
+                                failing_content,
+                                correct=True,
+                                client_answer_id=failing_answer_id,
+                            ),
+                        ]
+                    },
+                )
+            assert progress_rows(database_url, user_id) == {}
+            assert activity_rows(database_url, user_id) == []
+            with psycopg.connect(database_url) as conn:
+                stats = conn.execute(
+                    """
+                    SELECT current_streak, longest_streak, total_items_seen,
+                           total_mastered, total_xp
+                    FROM user_stats WHERE user_id=%s
+                    """,
+                    (user_id,),
+                ).fetchone()
+                receipt_count = conn.execute(
+                    """
+                    SELECT count(*) FROM study_answer_receipts
+                    WHERE user_id=%s AND client_answer_id=ANY(%s)
+                    """,
+                    (user_id, [first_answer_id, failing_answer_id]),
+                ).fetchone()[0]
+            assert stats == (0, 0, 0, 0, 0)
+            assert receipt_count == 0
+        finally:
+            with psycopg.connect(database_url, autocommit=True) as conn:
+                conn.execute(f"DROP TRIGGER IF EXISTS {trigger} ON user_progress")
+                conn.execute(f"DROP FUNCTION IF EXISTS {function}()")
+
+
+async def test_concurrent_reversed_batches_finish_without_deadlock_and_keep_all_counts(
+    client, database_url, user_id, auth_headers
+):
+    first_content, second_content = published_content_ids(database_url, 2)
+    headers = auth_headers(subject=user_id)
+    with study_user(database_url, user_id):
+        responses = await asyncio.wait_for(
+            asyncio.gather(
+                client.post(
+                    "/v1/study/answers",
+                    headers=headers,
+                    json={
+                        "answers": [
+                            answer(first_content, correct=True),
+                            answer(second_content, correct=False),
+                        ]
+                    },
+                ),
+                client.post(
+                    "/v1/study/answers",
+                    headers=headers,
+                    json={
+                        "answers": [
+                            answer(second_content, correct=True),
+                            answer(first_content, correct=False),
+                        ]
+                    },
+                ),
+            ),
+            timeout=10,
+        )
+        assert [response.status_code for response in responses] == [200, 200]
+        rows = progress_rows(database_url, user_id)
+        assert rows[first_content][:3] == (2, 1, 1)
+        assert rows[second_content][:3] == (2, 1, 1)
+        assert activity_rows(database_url, user_id)[0][1:4] == (4, 0, 24)
+
+
+async def test_activity_uses_each_users_local_day_for_the_same_utc_instant(
+    client, database_url, auth_headers, monkeypatch
+):
+    from app.routers import study
+
+    class FrozenDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            instant = cls(2026, 1, 15, 11, 30, tzinfo=UTC)
+            return instant if tz is None else instant.astimezone(tz)
+
+    monkeypatch.setattr(study, "datetime", FrozenDateTime)
+    content_id = published_content_ids(database_url, 1)[0]
+    auckland_user, los_angeles_user = uuid.uuid4(), uuid.uuid4()
+    expected_dates = {
+        auckland_user: datetime(2026, 1, 16).date(),
+        los_angeles_user: datetime(2026, 1, 15).date(),
+    }
+    timezones = {
+        auckland_user: "Pacific/Auckland",
+        los_angeles_user: "America/Los_Angeles",
+    }
+
+    with study_user(database_url, auckland_user), study_user(database_url, los_angeles_user):
+        for subject in (auckland_user, los_angeles_user):
+            headers = auth_headers(subject=subject)
+            await provision(client, headers)
+            patched = await client.patch(
+                "/v1/me/preferences",
+                headers=headers,
+                json={"timezone": timezones[subject]},
+            )
+            assert patched.status_code == 200
+            response = await client.post(
+                "/v1/study/answers",
+                headers=headers,
+                json={"answers": [answer(content_id, correct=True)]},
+            )
+            assert response.status_code == 200
+            assert activity_rows(database_url, subject)[0][0] == expected_dates[subject]
 
 
 async def test_streak_same_day_consecutive_day_and_gap_updates_once_per_batch(
@@ -423,8 +644,8 @@ async def test_streak_same_day_consecutive_day_and_gap_updates_once_per_batch(
     headers = auth_headers(subject=user_id)
     with study_user(database_url, user_id):
         await provision(client, headers)
-        today = date.today()
         with psycopg.connect(database_url, autocommit=True) as conn:
+            today = conn.execute("SELECT CURRENT_DATE").fetchone()[0]
             conn.execute(
                 """
                 UPDATE user_stats
@@ -468,15 +689,18 @@ async def test_streak_same_day_consecutive_day_and_gap_updates_once_per_batch(
 
 
 @pytest.mark.parametrize(
-    "daily_minutes,durations,expected",
+    "daily_minutes,total_ms,expected",
     [
-        (5, [300_000], True),
-        (15, [300_000, 300_000, 299_000], False),
-        (30, [300_000] * 6, True),
+        (5, 299_000, False),
+        (5, 300_000, True),
+        (15, 899_000, False),
+        (15, 900_000, True),
+        (30, 1_799_000, False),
+        (30, 1_800_000, True),
     ],
 )
 async def test_daily_goal_thresholds(
-    client, database_url, user_id, auth_headers, daily_minutes, durations, expected
+    client, database_url, user_id, auth_headers, daily_minutes, total_ms, expected
 ):
     content_id = published_content_ids(database_url, 1)[0]
     headers = auth_headers(subject=user_id)
@@ -491,7 +715,11 @@ async def test_daily_goal_thresholds(
             headers=headers,
             json={
                 "answers": [
-                    answer(content_id, correct=True, duration_ms=duration) for duration in durations
+                    answer(content_id, correct=True, duration_ms=duration)
+                    for duration in (
+                        [300_000] * (total_ms // 300_000)
+                        + ([total_ms % 300_000] if total_ms % 300_000 else [])
+                    )
                 ]
             },
         )
@@ -522,9 +750,9 @@ async def test_me_stats_requires_auth_and_returns_totals_today_and_last_30_dates
     headers = auth_headers(subject=user_id)
     with study_user(database_url, user_id):
         await provision(client, headers)
-        today = date.today()
-        dates = [today - timedelta(days=31), today - timedelta(days=29), today]
         with psycopg.connect(database_url, autocommit=True) as conn:
+            today = conn.execute("SELECT CURRENT_DATE").fetchone()[0]
+            dates = [today - timedelta(days=31), today - timedelta(days=29), today]
             conn.execute(
                 """
                 UPDATE user_stats
