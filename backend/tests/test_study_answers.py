@@ -478,6 +478,44 @@ async def test_idempotency_retry_conflict_and_within_batch_classification(
     assert activity[0][1:4] == (3, 1, 22)
 
 
+async def test_idempotency_receipt_does_not_depend_on_original_content_row(
+    client, database_url, user_id, auth_headers
+):
+    valid_content_id = published_content_ids(database_url, 1)[0]
+    absent_content_id = 9_223_372_036_854_775_807
+    answer_id = uuid.uuid4()
+    headers = auth_headers(subject=user_id)
+
+    with study_user(database_url, user_id):
+        await provision(client, headers)
+        with psycopg.connect(database_url, autocommit=True) as conn:
+            assert (
+                conn.execute(
+                    "SELECT 1 FROM content_items WHERE id = %s", (absent_content_id,)
+                ).fetchone()
+                is None
+            )
+            conn.execute(
+                """INSERT INTO study_answer_receipts(user_id, client_answer_id, content_id)
+                   VALUES (%s, %s, %s)""",
+                (user_id, str(answer_id), absent_content_id),
+            )
+
+        response = await client.post(
+            "/v1/study/answers",
+            headers=headers,
+            json={"answers": [answer(valid_content_id, correct=True, client_answer_id=answer_id)]},
+        )
+        rows = progress_rows(database_url, user_id)
+        activity = activity_rows(database_url, user_id)
+
+    assert response.status_code == 200
+    assert response.json()["results"][0]["status"] == "id_conflict"
+    assert response.json()["accepted_count"] == 0
+    assert rows == {}
+    assert activity == []
+
+
 @pytest.mark.parametrize("kind", ["unknown", "duplicate"])
 async def test_batches_without_accepted_answers_do_not_touch_activity_or_streak(
     client, database_url, user_id, auth_headers, kind

@@ -387,6 +387,25 @@ async def test_patch_preferences_rejects_unknown_fields_and_invalid_enums(
         assert response.status_code == 422
 
 
+async def test_patch_preferences_validates_iana_timezone_names(
+    client, database_url, user_id, auth_headers
+):
+    headers = auth_headers(subject=user_id)
+    with remove_test_users(database_url, user_id):
+        valid = await client.patch(
+            "/v1/me/preferences", headers=headers, json={"timezone": "Pacific/Auckland"}
+        )
+        invalid = await client.patch(
+            "/v1/me/preferences", headers=headers, json={"timezone": "Not/A_Real_Timezone"}
+        )
+
+        assert valid.status_code == 200
+        assert valid.json()["preferences"]["timezone"] == "Pacific/Auckland"
+        assert invalid.status_code == 422
+        profile = await client.get("/v1/me", headers=headers)
+        assert profile.json()["preferences"]["timezone"] == "Pacific/Auckland"
+
+
 async def test_me_endpoints_are_scoped_only_to_each_token_subject(
     client, database_url, auth_headers
 ):
