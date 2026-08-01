@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import re
 import uuid
 from collections.abc import Iterator
@@ -88,10 +89,9 @@ async def test_first_authenticated_request_provisions_each_user_row_once(
     )
     with remove_test_users(database_url, user_id):
         first = await client.get("/v1/me", headers=headers)
-        second = await client.get("/v1/me", headers=headers)
 
-        assert first.status_code == second.status_code == 200
-        assert first.json()["id"] == second.json()["id"] == str(user_id)
+        assert first.status_code == 200
+        assert first.json()["id"] == str(user_id)
         assert first.json()["display_name"] == "New Learner"
         assert auth_row_counts(database_url, user_id) == (1, 1, 1)
 
@@ -106,6 +106,27 @@ async def test_first_authenticated_request_provisions_each_user_row_once(
                 (user_id,),
             ).fetchone()
         assert preferences == ("ibo", None)
+
+        second = await client.get("/v1/me", headers=headers)
+
+        assert second.status_code == 200
+        assert second.json()["id"] == str(user_id)
+        assert auth_row_counts(database_url, user_id) == (1, 1, 1)
+
+
+async def test_concurrent_first_requests_converge_on_one_provisioned_user(
+    client, database_url, user_id, auth_headers
+):
+    headers = auth_headers(subject=user_id, user_metadata={"full_name": "Concurrent Learner"})
+    with remove_test_users(database_url, user_id):
+        first, second = await asyncio.gather(
+            client.get("/v1/me", headers=headers),
+            client.get("/v1/me", headers=headers),
+        )
+
+        assert first.status_code == second.status_code == 200
+        assert first.json()["id"] == second.json()["id"] == str(user_id)
+        assert auth_row_counts(database_url, user_id) == (1, 1, 1)
 
 
 async def test_equal_display_names_receive_distinct_url_safe_share_slugs(
@@ -134,6 +155,12 @@ async def test_last_seen_advances_only_when_missing_or_older_than_one_hour(
     old_time = datetime.now(UTC) - timedelta(hours=2)
     with remove_test_users(database_url, user_id):
         assert (await client.get("/v1/me", headers=headers)).status_code == 200
+        with psycopg.connect(database_url) as conn:
+            initial = conn.execute(
+                "SELECT last_seen_at FROM app_users WHERE id = %s", (user_id,)
+            ).fetchone()[0]
+        assert initial is not None
+
         with psycopg.connect(database_url, autocommit=True) as conn:
             conn.execute(
                 "UPDATE app_users SET last_seen_at = %s WHERE id = %s", (old_time, user_id)
