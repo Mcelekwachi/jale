@@ -16,6 +16,8 @@ _INTERVALS = {
     4: timedelta(days=21),
     5: timedelta(days=60),
 }
+_BIGINT_MIN = -(2**63)
+_BIGINT_MAX = 2**63 - 1
 
 
 def get_utc_now() -> datetime:
@@ -95,12 +97,16 @@ async def record_answers(user_id: UUID, answers: list[StudyAnswer], now: datetim
                 "today_xp": activity["xp"] if activity else 0,
             }
 
-        content_ids = sorted({item.content_id for item in answers})
-        cursor = await conn.execute(
-            "SELECT id FROM content_items WHERE id = ANY(%(ids)s) AND status='published'",
-            {"ids": content_ids},
+        content_ids = sorted(
+            {item.content_id for item in answers if _BIGINT_MIN <= item.content_id <= _BIGINT_MAX}
         )
-        published = {row["id"] for row in await cursor.fetchall()}
+        published: set[int] = set()
+        if content_ids:
+            cursor = await conn.execute(
+                "SELECT id FROM content_items WHERE id = ANY(%(ids)s) AND status='published'",
+                {"ids": content_ids},
+            )
+            published = {row["id"] for row in await cursor.fetchall()}
         client_ids = [
             item.client_answer_id for item in answers if item.client_answer_id is not None
         ]
