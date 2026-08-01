@@ -3,19 +3,22 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Body, Depends, HTTPException
 
 from app.auth import current_user
 from app.schemas import (
     PreferencesPatch,
+    ResolvedTrack,
     SkipOnboarding,
     UserProfile,
     patch_values,
 )
+from app.services import track_resolver
 from app.services.meta_languages import validate_meta_language_id
 from app.services.users import (
     complete_onboarding,
     get_user_profile,
+    get_user_track_preferences,
     skip_onboarding,
     update_preferences,
 )
@@ -30,6 +33,25 @@ def _user_id(user: dict) -> UUID:
 @router.get("", response_model=UserProfile)
 async def read_me(user: Annotated[dict, Depends(current_user)]) -> dict:
     return await get_user_profile(_user_id(user))
+
+
+@router.get("/track", response_model=ResolvedTrack)
+async def read_my_track(user: Annotated[dict, Depends(current_user)]) -> dict:
+    preferences = await get_user_track_preferences(_user_id(user))
+    language = preferences.pop("language")
+    track, priority = await track_resolver.resolve(language, **preferences)
+    if track is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"no track resolved for language {language!r} — is it seeded?",
+        )
+    track = dict(track)
+    track["units"] = await track_resolver.get_units(language, track["slug"])
+    return {
+        "track": track,
+        "matched_priority": priority,
+        "is_fallback": bool(track["is_default"]),
+    }
 
 
 @router.patch("/preferences", response_model=UserProfile)

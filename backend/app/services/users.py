@@ -150,6 +150,24 @@ async def get_user_profile(user_id: uuid.UUID) -> dict[str, Any]:
         return dict(row)
 
 
+async def get_user_track_preferences(user_id: uuid.UUID) -> dict[str, Any]:
+    async with get_pool().connection() as conn:
+        cursor = await conn.execute(
+            """
+            SELECT l.code AS language, p.age_band AS age, p.connection,
+                   p.goal, p.style
+              FROM user_preferences p
+              JOIN languages l ON l.id = p.active_language_id
+             WHERE p.user_id = %(user_id)s
+            """,
+            {"user_id": user_id},
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            raise RuntimeError("authenticated user preferences are missing")
+        return dict(row)
+
+
 async def update_preferences(user_id: uuid.UUID, changes: dict[str, Any]) -> dict[str, Any]:
     invalid = changes.keys() - _PREFERENCE_FIELDS
     if invalid:
