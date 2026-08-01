@@ -3,9 +3,12 @@ value fails loudly here rather than reaching the React client."""
 
 from __future__ import annotations
 
+from datetime import datetime, time
 from enum import Enum
+from typing import Any, Literal
+from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 # --- enums, mirroring schema.sql -------------------------------------------
 
@@ -193,3 +196,80 @@ class StudySession(BaseModel):
     unit_title: str
     mode: StudyMode
     items: list[StudyItem]
+
+
+class UserPreferences(BaseModel):
+    active_language_id: int
+    meta_language_id: int | None = None
+    active_dialect_id: int | None = None
+    age_band: AgeBand | None = None
+    connection: Connection | None = None
+    goal: Goal | None = None
+    style: Style | None = None
+    daily_minutes: int | None = None
+    reminder_enabled: bool
+    reminder_time: time | None = None
+    timezone: str
+    placement_level: Difficulty | None = None
+    placement_skipped: bool
+    onboarding_status: str
+    onboarding_last_screen: int | None = None
+    completed_at: datetime | None = None
+    updated_at: datetime
+
+
+class UserProfile(BaseModel):
+    id: UUID
+    email: str | None = None
+    display_name: str | None = None
+    avatar_url: str | None = None
+    role: str
+    share_slug: str | None = None
+    is_active: bool
+    created_at: datetime
+    last_seen_at: datetime | None = None
+    preferences: UserPreferences
+
+
+class PreferencesPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    active_language_id: int | None = None
+    meta_language_id: int | None = None
+    age_band: AgeBand | None = None
+    connection: Connection | None = None
+    goal: Goal | None = None
+    style: Style | None = None
+    daily_minutes: Literal[5, 15, 30] | None = None
+    reminder_enabled: bool | None = None
+    reminder_time: time | None = None
+    timezone: str | None = None
+    placement_level: Difficulty | None = None
+    onboarding_last_screen: int | None = Field(default=None, ge=1, le=8)
+
+    @model_validator(mode="after")
+    def reject_null_required_selections(self) -> PreferencesPatch:
+        cannot_clear = {
+            "active_language_id",
+            "age_band",
+            "connection",
+            "goal",
+            "style",
+            "reminder_enabled",
+            "timezone",
+        }
+        for field in cannot_clear & self.model_fields_set:
+            if getattr(self, field) is None:
+                raise ValueError(f"{field} cannot be null")
+        return self
+
+
+class SkipOnboarding(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    onboarding_last_screen: int | None = Field(default=None, ge=1, le=8)
+
+
+def patch_values(model: BaseModel) -> dict[str, Any]:
+    """Return only explicitly supplied fields, retaining explicit nulls."""
+    return {field: getattr(model, field) for field in model.model_fields_set}

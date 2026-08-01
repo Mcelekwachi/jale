@@ -9,6 +9,21 @@ from typing import Any
 from app.config import get_settings
 from app.db import get_pool
 
+_PREFERENCE_FIELDS = {
+    "active_language_id",
+    "meta_language_id",
+    "age_band",
+    "connection",
+    "goal",
+    "style",
+    "daily_minutes",
+    "reminder_enabled",
+    "reminder_time",
+    "timezone",
+    "placement_level",
+    "onboarding_last_screen",
+}
+
 
 def _slug_base(display_name: str | None) -> str:
     normalized = unicodedata.normalize("NFKD", display_name or "learner")
@@ -114,3 +129,77 @@ async def provision_user(claims: dict[str, Any]) -> dict[str, Any]:
         if user is None:
             raise RuntimeError("authenticated user provisioning failed")
         return dict(user)
+
+
+async def get_user_profile(user_id: uuid.UUID) -> dict[str, Any]:
+    async with get_pool().connection() as conn:
+        cursor = await conn.execute(
+            """
+            SELECT u.id, u.email, u.display_name, u.avatar_url, u.role,
+                   u.share_slug, u.is_active, u.created_at, u.last_seen_at,
+                   to_jsonb(p) AS preferences
+              FROM app_users u
+              JOIN user_preferences p ON p.user_id = u.id
+             WHERE u.id = %(user_id)s
+            """,
+            {"user_id": user_id},
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            raise RuntimeError("authenticated user profile is missing")
+        return dict(row)
+
+
+async def update_preferences(user_id: uuid.UUID, changes: dict[str, Any]) -> dict[str, Any]:
+    invalid = changes.keys() - _PREFERENCE_FIELDS
+    if invalid:
+        raise ValueError(f"unsupported preference fields: {sorted(invalid)!r}")
+    if changes:
+        assignments = ", ".join(f"{field} = %({field})s" for field in sorted(changes))
+        async with get_pool().connection() as conn:
+            await conn.execute(
+                f"UPDATE user_preferences SET {assignments} WHERE user_id = %(user_id)s",  # noqa: S608
+                {"user_id": user_id, **changes},
+            )
+    return await get_user_profile(user_id)
+
+
+async def complete_onboarding(user_id: uuid.UUID) -> dict[str, Any]:
+    async with get_pool().connection() as conn:
+        await conn.execute(
+            """
+            UPDATE user_preferences
+               SET onboarding_status = 'completed', completed_at = now()
+             WHERE user_id = %(user_id)s
+               AND onboarding_status = 'not_started'
+            """,
+            {"user_id": user_id},
+        )
+    return await get_user_profile(user_id)
+
+
+async def skip_onboarding(
+    user_id: uuid.UUID, *, screen_supplied: bool, screen: int | None
+) -> dict[str, Any]:
+    async with get_pool().connection() as conn:
+        if screen_supplied:
+            await conn.execute(
+                """
+                UPDATE user_preferences
+                   SET onboarding_status = 'skipped', onboarding_last_screen = %(screen)s
+                 WHERE user_id = %(user_id)s
+                   AND onboarding_status = 'not_started'
+                """,
+                {"user_id": user_id, "screen": screen},
+            )
+        else:
+            await conn.execute(
+                """
+                UPDATE user_preferences
+                   SET onboarding_status = 'skipped'
+                 WHERE user_id = %(user_id)s
+                   AND onboarding_status = 'not_started'
+                """,
+                {"user_id": user_id},
+            )
+    return await get_user_profile(user_id)
