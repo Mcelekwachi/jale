@@ -32,9 +32,9 @@ _TEST_JWT_AUDIENCE = "authenticated"
 
 # Settings are cached when the application is created, so auth configuration
 # must exist before any fixture imports app.main.
-os.environ.setdefault("SUPABASE_JWT_SECRET", _TEST_JWT_SECRET)
-os.environ.setdefault("SUPABASE_JWT_AUDIENCE", _TEST_JWT_AUDIENCE)
-os.environ.setdefault("SUPABASE_PROJECT_URL", "https://test-project.supabase.co")
+os.environ["SUPABASE_JWT_SECRET"] = _TEST_JWT_SECRET
+os.environ["SUPABASE_JWT_AUDIENCE"] = _TEST_JWT_AUDIENCE
+os.environ["SUPABASE_PROJECT_URL"] = "https://test-project.supabase.co"
 
 pytest_plugins = ("pytest_asyncio",)
 
