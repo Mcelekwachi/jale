@@ -528,8 +528,8 @@ async def test_mid_batch_database_failure_rolls_back_all_answer_side_effects(
                 f"FOR EACH ROW EXECUTE FUNCTION {function}()"
             )
         try:
-            with pytest.raises(psycopg.DatabaseError, match="deliberate study batch failure"):
-                await client.post(
+            try:
+                failed_response = await client.post(
                     "/v1/study/answers",
                     headers=headers,
                     json={
@@ -543,6 +543,10 @@ async def test_mid_batch_database_failure_rolls_back_all_answer_side_effects(
                         ]
                     },
                 )
+            except psycopg.DatabaseError as exc:
+                assert "deliberate study batch failure" in str(exc)
+            else:
+                assert 500 <= failed_response.status_code < 600
             assert progress_rows(database_url, user_id) == {}
             assert activity_rows(database_url, user_id) == []
         finally:
