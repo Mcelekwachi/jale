@@ -25,6 +25,14 @@ def _validate_content_id(content_id: int) -> None:
         raise HTTPException(status_code=404, detail="content not found")
 
 
+async def _lock_content(conn, content_id: int) -> None:
+    content = await (
+        await conn.execute("SELECT 1 FROM content_items WHERE id=%s FOR UPDATE", (content_id,))
+    ).fetchone()
+    if content is None:
+        raise HTTPException(status_code=404, detail="content not found")
+
+
 async def create_flag(
     content_id: int,
     user_id: UUID,
@@ -34,11 +42,7 @@ async def create_flag(
 ) -> dict:
     _validate_content_id(content_id)
     async with get_pool().connection() as conn, conn.transaction():
-        content = await (
-            await conn.execute("SELECT 1 FROM content_items WHERE id=%s", (content_id,))
-        ).fetchone()
-        if content is None:
-            raise HTTPException(status_code=404, detail="content not found")
+        await _lock_content(conn, content_id)
 
         await conn.execute(
             """
@@ -82,6 +86,7 @@ async def delete_flag(
 ) -> None:
     _validate_content_id(content_id)
     async with get_pool().connection() as conn, conn.transaction():
+        await _lock_content(conn, content_id)
         deleted = await (
             await conn.execute(
                 """
