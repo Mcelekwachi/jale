@@ -176,11 +176,28 @@ and **never blanks it once set**, so a re-seed cannot destroy their work.
 
 ## 6. Authenticated authorization boundary
 
-Every SQL operation behind `/v1/me` is scoped by the user's UUID extracted
-from a locally verified authentication token. The API never accepts a user ID
-from request input for these operations.
+Every user-owned SQL operation behind `/v1/me`, `/v1/study`, and content-flag
+writes is scoped by the user's UUID extracted from a locally verified
+authentication token. The API never accepts a user ID from request input for
+these operations.
 
 Row-level security is intentionally deferred while the service-role API is the
 sole database client. The service role bypasses RLS, so enabling policies now
 would imply a protection boundary they do not provide. Authorization is
-therefore enforced by the API's token-derived UUID at every `/v1/me` query.
+therefore enforced by the API's token-derived UUID at every user-owned query.
+
+---
+
+## 7. Study write path
+
+An answer batch is one database transaction. Client answer IDs are immutable
+per-user idempotency claims in the same transaction as progress, daily
+activity, and aggregate stats, so a failed flush can be retried without losing
+or double-counting work. Progress rows are locked in content-ID order and
+streak dates are resolved in the learner's IANA timezone.
+
+Content flags are scoped independently to either the item or one explanation
+language. Their existing trigger remains the sole owner of `flag_count`, with
+mutations serialized on the content row. Public share profiles use a separate
+six-field projection and never expose user IDs, email, preferences, progress,
+flags, or exact timestamps.
