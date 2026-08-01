@@ -22,6 +22,8 @@ def _decode(credentials: HTTPAuthorizationCredentials | None) -> dict[str, Any]:
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise _AUTH_ERROR
     settings = get_settings()
+    if not settings.supabase_jwt_secret:
+        raise _AUTH_ERROR
     try:
         claims = jwt.decode(
             credentials.credentials,
