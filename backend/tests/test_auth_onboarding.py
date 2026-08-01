@@ -297,3 +297,314 @@ async def test_require_admin_rejects_learner_and_accepts_database_admin(
 
         assert admin.status_code == 200
         assert admin.json() == {"id": str(user_id), "role": "admin"}
+
+
+async def test_get_me_returns_profile_with_nested_preferences(
+    client, database_url, user_id, auth_headers
+):
+    headers = auth_headers(
+        subject=user_id,
+        email="profile@example.test",
+        user_metadata={"full_name": "Profile Learner"},
+    )
+    with remove_test_users(database_url, user_id):
+        response = await client.get("/v1/me", headers=headers)
+
+        assert response.status_code == 200
+        profile = response.json()
+        assert {
+            "id": profile["id"],
+            "email": profile["email"],
+            "display_name": profile["display_name"],
+            "role": profile["role"],
+        } == {
+            "id": str(user_id),
+            "email": "profile@example.test",
+            "display_name": "Profile Learner",
+            "role": "learner",
+        }
+        assert profile["share_slug"]
+        assert "avatar_url" in profile
+        assert set(profile["preferences"]) >= {
+            "active_language_id",
+            "meta_language_id",
+            "age_band",
+            "connection",
+            "goal",
+            "style",
+            "daily_minutes",
+            "reminder_enabled",
+            "reminder_time",
+            "timezone",
+            "placement_level",
+            "placement_skipped",
+            "onboarding_status",
+            "onboarding_last_screen",
+            "completed_at",
+        }
+        assert profile["preferences"]["onboarding_status"] == "not_started"
+
+
+async def test_patch_preferences_is_partial_and_does_not_change_onboarding_status(
+    client, database_url, user_id, auth_headers
+):
+    headers = auth_headers(subject=user_id)
+    with remove_test_users(database_url, user_id):
+        before = (await client.get("/v1/me", headers=headers)).json()["preferences"]
+
+        response = await client.patch(
+            "/v1/me/preferences", headers=headers, json={"daily_minutes": 15}
+        )
+
+        assert response.status_code == 200
+        after = response.json()["preferences"]
+        assert after["daily_minutes"] == 15
+        assert after["onboarding_status"] == before["onboarding_status"] == "not_started"
+        changing_fields = {"daily_minutes", "updated_at"}
+        assert {key: value for key, value in after.items() if key not in changing_fields} == {
+            key: value for key, value in before.items() if key not in changing_fields
+        }
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"unknown_field": "not allowed"},
+        {"age_band": "centuries_old"},
+        {"connection": "martian"},
+        {"goal": "invalid_goal"},
+        {"style": "invalid_style"},
+        {"placement_level": "impossible"},
+    ],
+)
+async def test_patch_preferences_rejects_unknown_fields_and_invalid_enums(
+    client, database_url, user_id, auth_headers, payload
+):
+    with remove_test_users(database_url, user_id):
+        response = await client.patch(
+            "/v1/me/preferences", headers=auth_headers(subject=user_id), json=payload
+        )
+        assert response.status_code == 422
+
+
+async def test_me_endpoints_are_scoped_only_to_each_token_subject(
+    client, database_url, auth_headers
+):
+    first_id, second_id = uuid.uuid4(), uuid.uuid4()
+    first_headers = auth_headers(subject=first_id, user_metadata={"full_name": "First Owner"})
+    second_headers = auth_headers(subject=second_id, user_metadata={"full_name": "Second Owner"})
+    with remove_test_users(database_url, first_id, second_id):
+        first = await client.get(
+            "/v1/me", headers=first_headers, params={"user_id": str(second_id)}
+        )
+        second = await client.get(
+            "/v1/me", headers=second_headers, params={"user_id": str(first_id)}
+        )
+        assert first.status_code == second.status_code == 200
+        assert first.json()["id"] == str(first_id)
+        assert first.json()["display_name"] == "First Owner"
+        assert second.json()["id"] == str(second_id)
+        assert second.json()["display_name"] == "Second Owner"
+
+        assert (
+            await client.patch(
+                "/v1/me/preferences",
+                headers=first_headers,
+                params={"user_id": str(second_id)},
+                json={"daily_minutes": 30},
+            )
+        ).status_code == 200
+        first_after = (await client.get("/v1/me", headers=first_headers)).json()
+        second_after = (await client.get("/v1/me", headers=second_headers)).json()
+        assert first_after["preferences"]["daily_minutes"] == 30
+        assert second_after["preferences"]["daily_minutes"] != 30
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["active_language_id", "age_band", "connection", "goal", "style"],
+)
+async def test_patch_preferences_rejects_null_for_required_selection_fields(
+    client, database_url, user_id, auth_headers, field
+):
+    with remove_test_users(database_url, user_id):
+        response = await client.patch(
+            "/v1/me/preferences",
+            headers=auth_headers(subject=user_id),
+            json={field: None},
+        )
+        assert response.status_code == 422
+
+
+async def test_patch_preferences_clears_nullable_fields(
+    client, database_url, user_id, auth_headers
+):
+    headers = auth_headers(subject=user_id)
+    with remove_test_users(database_url, user_id):
+        assert (await client.get("/v1/me", headers=headers)).status_code == 200
+        with psycopg.connect(database_url) as conn:
+            english_id = conn.execute("SELECT id FROM languages WHERE code = 'eng'").fetchone()[0]
+
+        populated = await client.patch(
+            "/v1/me/preferences",
+            headers=headers,
+            json={
+                "meta_language_id": english_id,
+                "reminder_time": "09:30:00",
+                "placement_level": "beginner",
+                "onboarding_last_screen": 4,
+            },
+        )
+        assert populated.status_code == 200
+
+        cleared = await client.patch(
+            "/v1/me/preferences",
+            headers=headers,
+            json={
+                "meta_language_id": None,
+                "reminder_time": None,
+                "placement_level": None,
+                "onboarding_last_screen": None,
+            },
+        )
+
+        assert cleared.status_code == 200
+        preferences = cleared.json()["preferences"]
+        assert preferences["meta_language_id"] is None
+        assert preferences["reminder_time"] is None
+        assert preferences["placement_level"] is None
+        assert preferences["onboarding_last_screen"] is None
+
+
+async def test_patch_preferences_accepts_meta_language_and_rejects_target_language(
+    client, database_url, user_id, auth_headers
+):
+    headers = auth_headers(subject=user_id)
+    with psycopg.connect(database_url) as conn:
+        ids = dict(
+            conn.execute("SELECT code, id FROM languages WHERE code IN ('eng', 'ibo')").fetchall()
+        )
+    with remove_test_users(database_url, user_id):
+        valid = await client.patch(
+            "/v1/me/preferences", headers=headers, json={"meta_language_id": ids["eng"]}
+        )
+        invalid = await client.patch(
+            "/v1/me/preferences", headers=headers, json={"meta_language_id": ids["ibo"]}
+        )
+
+        assert valid.status_code == 200
+        assert valid.json()["preferences"]["meta_language_id"] == ids["eng"]
+        assert invalid.status_code == 422
+
+
+async def test_complete_onboarding_is_idempotent_and_keeps_completed_at(
+    client, database_url, user_id, auth_headers
+):
+    headers = auth_headers(subject=user_id)
+    with remove_test_users(database_url, user_id):
+        first = await client.post("/v1/me/onboarding/complete", headers=headers)
+        second = await client.post("/v1/me/onboarding/complete", headers=headers)
+
+        assert first.status_code == second.status_code == 200
+        first_preferences = first.json()["preferences"]
+        second_preferences = second.json()["preferences"]
+        assert first_preferences["onboarding_status"] == "completed"
+        assert first_preferences["completed_at"] is not None
+        assert second_preferences["completed_at"] == first_preferences["completed_at"]
+
+
+async def test_skip_onboarding_records_screen_four(client, database_url, user_id, auth_headers):
+    with remove_test_users(database_url, user_id):
+        response = await client.post(
+            "/v1/me/onboarding/skip",
+            headers=auth_headers(subject=user_id),
+            json={"onboarding_last_screen": 4},
+        )
+
+        assert response.status_code == 200
+        preferences = response.json()["preferences"]
+        assert preferences["onboarding_status"] == "skipped"
+        assert preferences["onboarding_last_screen"] == 4
+
+
+async def test_skip_without_body_preserves_existing_screen(
+    client, database_url, user_id, auth_headers
+):
+    headers = auth_headers(subject=user_id)
+    with remove_test_users(database_url, user_id):
+        assert (
+            await client.patch(
+                "/v1/me/preferences",
+                headers=headers,
+                json={"onboarding_last_screen": 3},
+            )
+        ).status_code == 200
+
+        response = await client.post("/v1/me/onboarding/skip", headers=headers)
+
+        assert response.status_code == 200
+        preferences = response.json()["preferences"]
+        assert preferences["onboarding_status"] == "skipped"
+        assert preferences["onboarding_last_screen"] == 3
+
+
+async def test_skip_with_explicit_null_clears_existing_screen(
+    client, database_url, user_id, auth_headers
+):
+    headers = auth_headers(subject=user_id)
+    with remove_test_users(database_url, user_id):
+        assert (
+            await client.patch(
+                "/v1/me/preferences",
+                headers=headers,
+                json={"onboarding_last_screen": 3},
+            )
+        ).status_code == 200
+
+        response = await client.post(
+            "/v1/me/onboarding/skip",
+            headers=headers,
+            json={"onboarding_last_screen": None},
+        )
+
+        assert response.status_code == 200
+        preferences = response.json()["preferences"]
+        assert preferences["onboarding_status"] == "skipped"
+        assert preferences["onboarding_last_screen"] is None
+
+
+async def test_terminal_onboarding_states_cannot_overwrite_each_other(
+    client, database_url, auth_headers
+):
+    completed_id, skipped_id = uuid.uuid4(), uuid.uuid4()
+    completed_headers = auth_headers(subject=completed_id)
+    skipped_headers = auth_headers(subject=skipped_id)
+    with remove_test_users(database_url, completed_id, skipped_id):
+        completed = await client.post("/v1/me/onboarding/complete", headers=completed_headers)
+        completed_at = completed.json()["preferences"]["completed_at"]
+        skip_after_complete = await client.post(
+            "/v1/me/onboarding/skip",
+            headers=completed_headers,
+            json={"onboarding_last_screen": 4},
+        )
+
+        skipped = await client.post(
+            "/v1/me/onboarding/skip",
+            headers=skipped_headers,
+            json={"onboarding_last_screen": 5},
+        )
+        complete_after_skip = await client.post(
+            "/v1/me/onboarding/complete", headers=skipped_headers
+        )
+
+        assert completed.status_code == skip_after_complete.status_code == 200
+        completed_preferences = skip_after_complete.json()["preferences"]
+        assert completed_preferences["onboarding_status"] == "completed"
+        assert completed_preferences["completed_at"] == completed_at
+        assert completed_preferences["onboarding_last_screen"] is None
+
+        assert skipped.status_code == complete_after_skip.status_code == 200
+        skipped_preferences = complete_after_skip.json()["preferences"]
+        assert skipped_preferences["onboarding_status"] == "skipped"
+        assert skipped_preferences["onboarding_last_screen"] == 5
+        assert skipped_preferences["completed_at"] is None
