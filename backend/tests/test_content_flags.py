@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
 
 import psycopg
 import pytest
+from psycopg import sql
 
 pytestmark = pytest.mark.asyncio
 
@@ -56,6 +58,53 @@ def flag_count(database_url: str, content_id: int) -> int:
         return conn.execute(
             "SELECT flag_count FROM content_items WHERE id=%s", (content_id,)
         ).fetchone()[0]
+
+
+@contextmanager
+def force_flag_insert_overlap(
+    database_url: str, user_id: uuid.UUID, content_id: int
+) -> Iterator[None]:
+    suffix = uuid.uuid4().hex
+    function_name = f"test_flag_overlap_{suffix}_fn"
+    trigger_name = f"test_flag_overlap_{suffix}"
+    with psycopg.connect(database_url, autocommit=True) as conn:
+        conn.execute(
+            sql.SQL(
+                """
+                CREATE FUNCTION {}() RETURNS trigger LANGUAGE plpgsql AS $$
+                BEGIN
+                  IF NEW.user_id = {}::uuid AND NEW.content_id = {}::bigint THEN
+                    PERFORM pg_sleep(0.25);
+                  END IF;
+                  RETURN NEW;
+                END
+                $$
+                """
+            ).format(
+                sql.Identifier(function_name),
+                sql.Literal(str(user_id)),
+                sql.Literal(content_id),
+            )
+        )
+    try:
+        with psycopg.connect(database_url, autocommit=True) as conn:
+            conn.execute(
+                sql.SQL(
+                    "CREATE TRIGGER {} BEFORE INSERT ON content_flags "
+                    "FOR EACH ROW EXECUTE FUNCTION {}()"
+                ).format(sql.Identifier(trigger_name), sql.Identifier(function_name))
+            )
+        yield
+    finally:
+        with psycopg.connect(database_url, autocommit=True) as conn:
+            conn.execute(
+                sql.SQL("DROP TRIGGER IF EXISTS {} ON content_flags").format(
+                    sql.Identifier(trigger_name)
+                )
+            )
+            conn.execute(
+                sql.SQL("DROP FUNCTION IF EXISTS {}()").format(sql.Identifier(function_name))
+            )
 
 
 async def test_flag_endpoints_require_authentication(client, database_url):
@@ -240,3 +289,33 @@ async def test_post_ignores_client_user_id_and_unknown_content_is_404(
             json={"reason": "other"},
         )
         assert missing.status_code == 404
+
+
+async def test_item_and_translation_scopes_can_be_created_concurrently(
+    client, database_url, user_id, auth_headers
+):
+    content_id = published_content_id(database_url)
+    headers = auth_headers(subject=user_id)
+    path = f"/v1/content/{content_id}/flag"
+
+    with flag_users(database_url, user_id):
+        await client.get("/v1/me", headers=headers)
+        with force_flag_insert_overlap(database_url, user_id, content_id):
+            item, dutch = await asyncio.wait_for(
+                asyncio.gather(
+                    client.post(path, headers=headers, json={"reason": "bad_audio"}),
+                    client.post(
+                        path,
+                        headers=headers,
+                        json={"reason": "wrong_translation", "meta_language": "nld"},
+                    ),
+                ),
+                timeout=10,
+            )
+
+            assert item.status_code == dutch.status_code == 200
+            assert item.json()["id"] != dutch.json()["id"]
+            rows = stored_flags(database_url, content_id, user_id)
+            assert len(rows) == 2
+            assert {row[2] for row in rows} == {None, "nld"}
+            assert flag_count(database_url, content_id) == 2
