@@ -7,6 +7,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 
+import jwt
 import psycopg
 import pytest
 from fastapi import Depends, FastAPI
@@ -89,6 +90,43 @@ async def test_optional_auth_returns_none_only_when_header_is_absent(client):
     assert absent.json() == {"user": None}
     assert invalid.status_code == 401
     assert invalid.json() == {"detail": "Invalid authentication credentials"}
+
+
+async def test_empty_configured_secret_fails_closed_with_generic_401(monkeypatch):
+    from app.auth import current_user
+    from app.config import get_settings
+
+    test_app = FastAPI()
+
+    @test_app.get("/authenticated")
+    async def authenticated(user=Depends(current_user)):
+        return {"id": str(user["id"])}
+
+    claims = {
+        "sub": str(uuid.uuid4()),
+        "aud": "authenticated",
+        "exp": datetime.now(UTC) + timedelta(minutes=5),
+        "email": "empty-secret@example.test",
+    }
+    token = jwt.encode(claims, "", algorithm="HS256")
+
+    try:
+        with monkeypatch.context() as auth_env:
+            auth_env.setenv("SUPABASE_JWT_SECRET", "")
+            get_settings.cache_clear()
+            async with AsyncClient(
+                transport=ASGITransport(app=test_app), base_url="http://empty-secret.test"
+            ) as test_client:
+                response = await test_client.get(
+                    "/authenticated", headers={"Authorization": f"Bearer {token}"}
+                )
+    finally:
+        # The context restores the deterministic test secret before this clear.
+        get_settings.cache_clear()
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Invalid authentication credentials"}
+    assert response.headers["www-authenticate"] == "Bearer"
 
 
 async def test_first_authenticated_request_provisions_each_user_row_once(
