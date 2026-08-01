@@ -3,12 +3,13 @@ value fails loudly here rather than reaching the React client."""
 
 from __future__ import annotations
 
-from datetime import datetime, time
+from datetime import date, datetime, time
 from enum import Enum
 from typing import Any, Literal
 from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # --- enums, mirroring schema.sql -------------------------------------------
 
@@ -37,6 +38,15 @@ class StudyMode(str, Enum):
 class StudyDirection(str, Enum):
     target_to_meta = "target_to_meta"
     meta_to_target = "meta_to_target"
+
+
+class FlagReason(str, Enum):
+    bad_audio = "bad_audio"
+    wrong_translation = "wrong_translation"
+    cultural_inaccuracy = "cultural_inaccuracy"
+    spelling_or_tone = "spelling_or_tone"
+    offensive = "offensive"
+    other = "other"
 
 
 class AgeBand(str, Enum):
@@ -126,6 +136,28 @@ class ContentPage(BaseModel):
     offset: int
 
 
+class ContentFlagCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: FlagReason
+    note: str | None = None
+    meta_language: str | None = None
+
+
+class ContentFlag(BaseModel):
+    id: int
+    content_id: int
+    reason: FlagReason
+    note: str | None
+    meta_language: str | None
+    status: str
+    created_at: datetime
+
+
+class ContentFlagDelete(BaseModel):
+    deleted: bool
+
+
 class TrackUnit(BaseModel):
     position: int
     title: str
@@ -198,6 +230,52 @@ class StudySession(BaseModel):
     items: list[StudyItem]
 
 
+class DueStudyItems(BaseModel):
+    items: list[StudyItem]
+
+
+class StudyAnswer(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    content_id: int
+    correct: bool
+    mode: StudyMode
+    duration_ms: int | None = None
+    client_answer_id: str | None = None
+
+
+class StudyAnswersRequest(BaseModel):
+    answers: list[StudyAnswer] = Field(max_length=100)
+
+
+class StudyAnswerResult(BaseModel):
+    content_id: int
+    client_answer_id: str | None
+    status: Literal["accepted", "duplicate", "unknown_content", "id_conflict"]
+    leitner_box: int | None
+    due_at: datetime | None
+    mastered: bool
+
+
+class StudyAnswersResponse(BaseModel):
+    results: list[StudyAnswerResult]
+    accepted_count: int
+    skipped_count: int
+    current_streak: int
+    today_xp: int
+
+
+class UserStats(BaseModel):
+    current_streak: int
+    longest_streak: int
+    total_items_seen: int
+    total_mastered: int
+    total_xp: int
+    today_items_reviewed: int
+    today_goal_met: bool
+    activity_dates: list[date]
+
+
 class UserPreferences(BaseModel):
     active_language_id: int
     meta_language_id: int | None = None
@@ -231,6 +309,15 @@ class UserProfile(BaseModel):
     preferences: UserPreferences
 
 
+class PublicProfile(BaseModel):
+    display_name: str | None
+    current_streak: int
+    longest_streak: int
+    total_mastered: int
+    language: str
+    joined_month: str = Field(pattern=r"^\d{4}-\d{2}$")
+
+
 class PreferencesPatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -246,6 +333,16 @@ class PreferencesPatch(BaseModel):
     timezone: str | None = None
     placement_level: Difficulty | None = None
     onboarding_last_screen: int | None = Field(default=None, ge=1, le=8)
+
+    @field_validator("timezone")
+    @classmethod
+    def validate_timezone(cls, value: str | None) -> str | None:
+        if value is not None:
+            try:
+                ZoneInfo(value)
+            except (ZoneInfoNotFoundError, ValueError) as exc:
+                raise ValueError("timezone must be a valid IANA timezone") from exc
+        return value
 
     @model_validator(mode="after")
     def reject_null_required_selections(self) -> PreferencesPatch:

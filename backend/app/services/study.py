@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import random
+from datetime import datetime
+from uuid import UUID
 
 from app.db import fetch_all, fetch_one
 from app.schemas import StudyDirection
@@ -17,8 +19,8 @@ SELECT u.position, u.title, u.mode, u.item_count,
  WHERE l.code = %(language)s AND t.slug = %(slug)s AND u.position = %(position)s
 """
 
-_ITEMS_SQL = """
-SELECT c.id, c.content_type, c.difficulty_level, c.category_id,
+_TRANSLATED_ITEM_COLUMNS = """
+c.id, c.content_type, c.difficulty_level, c.category_id,
        c.target_text, c.target_text_toned,
        COALESCE(requested_ct.translation, default_ct.translation) AS translation,
        %(meta_language)s AS meta_language,
@@ -30,8 +32,10 @@ SELECT c.id, c.content_type, c.difficulty_level, c.category_id,
                 default_ct.cultural_note) AS cultural_note,
        c.example_sentence, c.example_translation,
        c.audio_url, c.audio_state, c.verified, c.flag_count
-  FROM content_items c
-  JOIN languages default_ml ON default_ml.code = %(default_meta_language)s
+"""
+
+_TRANSLATION_JOINS = """
+JOIN languages default_ml ON default_ml.code = %(default_meta_language)s
                            AND default_ml.is_meta
   JOIN content_translations default_ct ON default_ct.content_id = c.id
                                       AND default_ct.meta_language_id = default_ml.id
@@ -39,12 +43,32 @@ SELECT c.id, c.content_type, c.difficulty_level, c.category_id,
                              AND requested_ml.is_meta
   LEFT JOIN content_translations requested_ct ON requested_ct.content_id = c.id
                                              AND requested_ct.meta_language_id = requested_ml.id
+"""
+
+_ITEMS_SQL = f"""
+SELECT {_TRANSLATED_ITEM_COLUMNS}
+  FROM content_items c
+  {_TRANSLATION_JOINS}
  WHERE c.language_id = %(language_id)s
    AND c.status = 'published'
    AND (%(category_id)s::smallint IS NULL OR c.category_id = %(category_id)s)
    AND (%(content_type)s::content_type IS NULL OR c.content_type = %(content_type)s)
    AND (%(difficulty)s::difficulty_level IS NULL OR c.difficulty_level = %(difficulty)s)
  ORDER BY c.sort_order, c.id
+LIMIT %(limit)s
+"""
+
+_DUE_ITEMS_SQL = f"""
+SELECT {_TRANSLATED_ITEM_COLUMNS}
+  FROM user_progress progress
+  JOIN user_preferences preferences ON preferences.user_id = progress.user_id
+  JOIN content_items c ON c.id = progress.content_id
+  {_TRANSLATION_JOINS}
+ WHERE progress.user_id = %(user_id)s
+   AND c.language_id = preferences.active_language_id
+   AND c.status = 'published'
+   AND progress.due_at <= %(now)s
+ ORDER BY progress.due_at, c.id
  LIMIT %(limit)s
 """
 
@@ -73,7 +97,7 @@ async def get_unit(language: str, slug: str, position: int) -> dict | None:
     return await fetch_one(_UNIT_SQL, {"language": language, "slug": slug, "position": position})
 
 
-def _shape(
+def shape_item(
     row: dict,
     mode: str,
     direction: StudyDirection,
@@ -199,9 +223,9 @@ async def build_session(
             options = [{"text": answer, "is_correct": True}]
             options += [{"text": text, "is_correct": False} for text in picked]
             rng.shuffle(options)
-            items.append(_shape(row, mode, direction, options))
+            items.append(shape_item(row, mode, direction, options))
     else:
-        items = [_shape(row, mode, direction) for row in rows]
+        items = [shape_item(row, mode, direction) for row in rows]
 
     return {
         "track": unit["track_slug"],
@@ -210,3 +234,24 @@ async def build_session(
         "mode": mode,
         "items": items,
     }
+
+
+async def build_due_items(
+    user_id: UUID,
+    meta_language: str,
+    default_meta_language: str,
+    direction: StudyDirection,
+    now: datetime,
+    limit: int,
+) -> list[dict]:
+    rows = await fetch_all(
+        _DUE_ITEMS_SQL,
+        {
+            "user_id": user_id,
+            "meta_language": meta_language,
+            "default_meta_language": default_meta_language,
+            "now": now,
+            "limit": limit,
+        },
+    )
+    return [shape_item(row, "flashcard", direction) for row in rows]
