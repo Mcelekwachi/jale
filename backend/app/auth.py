@@ -4,7 +4,7 @@ import uuid
 from typing import Annotated, Any
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.config import get_settings
@@ -45,9 +45,10 @@ async def current_user(
 
 
 async def optional_current_user(
+    request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> dict[str, Any] | None:
-    if credentials is None:
+    if "authorization" not in request.headers:
         return None
     return await provision_user(_decode(credentials))
 
