@@ -7,8 +7,9 @@ from datetime import date, datetime, time
 from enum import Enum
 from typing import Any, Literal
 from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # --- enums, mirroring schema.sql -------------------------------------------
 
@@ -288,6 +289,16 @@ class PreferencesPatch(BaseModel):
     timezone: str | None = None
     placement_level: Difficulty | None = None
     onboarding_last_screen: int | None = Field(default=None, ge=1, le=8)
+
+    @field_validator("timezone")
+    @classmethod
+    def validate_timezone(cls, value: str | None) -> str | None:
+        if value is not None:
+            try:
+                ZoneInfo(value)
+            except (ZoneInfoNotFoundError, ValueError) as exc:
+                raise ValueError("timezone must be a valid IANA timezone") from exc
+        return value
 
     @model_validator(mode="after")
     def reject_null_required_selections(self) -> PreferencesPatch:

@@ -304,7 +304,7 @@ CREATE INDEX user_progress_due_idx ON user_progress (user_id, due_at);
 CREATE TABLE study_answer_receipts (
   user_id          UUID NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
   client_answer_id TEXT NOT NULL,
-  content_id       BIGINT NOT NULL REFERENCES content_items(id) ON DELETE CASCADE,
+  content_id       BIGINT NOT NULL,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (user_id, client_answer_id)
 );

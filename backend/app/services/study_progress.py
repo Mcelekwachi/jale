@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
@@ -26,14 +26,21 @@ def _local_date(now: datetime, timezone: str):
     return now.astimezone(ZoneInfo(timezone)).date()
 
 
-async def _context(conn, user_id: UUID, *, lock: bool = False) -> dict[str, Any]:
+async def _context(
+    conn, user_id: UUID, *, lock: Literal["share", "update"] | None = None
+) -> dict[str, Any]:
+    lock_clause = {
+        None: "",
+        "share": " FOR SHARE OF s",
+        "update": " FOR UPDATE OF s",
+    }[lock]
     cursor = await conn.execute(
         """
         SELECT s.*, p.timezone, p.daily_minutes
           FROM user_stats s JOIN user_preferences p ON p.user_id = s.user_id
          WHERE s.user_id = %(user_id)s
         """
-        + (" FOR UPDATE OF s" if lock else ""),
+        + lock_clause,
         {"user_id": user_id},
     )
     row = await cursor.fetchone()
@@ -44,7 +51,7 @@ async def _context(conn, user_id: UUID, *, lock: bool = False) -> dict[str, Any]
 
 async def get_stats(user_id: UUID, now: datetime) -> dict[str, Any]:
     async with get_pool().connection() as conn:
-        context = await _context(conn, user_id)
+        context = await _context(conn, user_id, lock="share")
         today = _local_date(now, context["timezone"])
         cursor = await conn.execute(
             """
@@ -72,7 +79,7 @@ async def get_stats(user_id: UUID, now: datetime) -> dict[str, Any]:
 
 async def record_answers(user_id: UUID, answers: list[StudyAnswer], now: datetime) -> dict:
     async with get_pool().connection() as conn, conn.transaction():
-        context = await _context(conn, user_id, lock=bool(answers))
+        context = await _context(conn, user_id, lock="update" if answers else "share")
         today = _local_date(now, context["timezone"])
         if not answers:
             cursor = await conn.execute(
