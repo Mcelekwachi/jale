@@ -24,12 +24,20 @@ def due_user(database_url: str, user_id: uuid.UUID) -> Iterator[None]:
 def dutch_translation(database_url: str, content_id: int, text: str) -> Iterator[None]:
     with psycopg.connect(database_url, autocommit=True) as conn:
         dutch_id = conn.execute("SELECT id FROM languages WHERE code='nld'").fetchone()[0]
+        existing = conn.execute(
+            """
+            SELECT translation, literal_translation, cultural_note, verified,
+                   verified_by, verified_at, contributor_id, created_at, updated_at
+              FROM content_translations
+             WHERE content_id=%s AND meta_language_id=%s
+            """,
+            (content_id, dutch_id),
+        ).fetchone()
+        assert existing is None, "test content must not already have a Dutch translation"
         conn.execute(
             """
             INSERT INTO content_translations (content_id, meta_language_id, translation)
             VALUES (%s, %s, %s)
-            ON CONFLICT (content_id, meta_language_id)
-            DO UPDATE SET translation=EXCLUDED.translation
             """,
             (content_id, dutch_id, text),
         )
@@ -41,6 +49,23 @@ def dutch_translation(database_url: str, content_id: int, text: str) -> Iterator
                 "DELETE FROM content_translations WHERE content_id=%s AND meta_language_id=%s",
                 (content_id, dutch_id),
             )
+
+
+@contextmanager
+def fixed_utc_now(client, instant: datetime) -> Iterator[None]:
+    from app.services.study_progress import get_utc_now
+
+    app = client._transport.app
+    missing = object()
+    previous = app.dependency_overrides.get(get_utc_now, missing)
+    app.dependency_overrides[get_utc_now] = lambda: instant
+    try:
+        yield
+    finally:
+        if previous is missing:
+            app.dependency_overrides.pop(get_utc_now, None)
+        else:
+            app.dependency_overrides[get_utc_now] = previous
 
 
 def published_rows(database_url: str, count: int) -> list[tuple[int, str, str]]:
@@ -90,6 +115,46 @@ def seed_progress(
 async def test_due_requires_authentication(client):
     response = await client.get("/v1/study/due")
     assert response.status_code == 401
+
+
+@pytest.mark.parametrize("meta_language", ["zzz", "ibo"])
+async def test_due_rejects_unknown_and_non_meta_languages(
+    client, database_url, user_id, auth_headers, meta_language
+):
+    with due_user(database_url, user_id):
+        response = await client.get(
+            "/v1/study/due",
+            headers=auth_headers(subject=user_id),
+            params={"meta_language": meta_language},
+        )
+        assert response.status_code == 400
+
+
+async def test_due_boundary_includes_exact_now_and_excludes_one_microsecond_later(
+    client, database_url, user_id, auth_headers
+):
+    included_id, future_id = [row[0] for row in published_rows(database_url, 2)]
+    headers = auth_headers(subject=user_id)
+    instant = datetime(2026, 2, 3, 4, 5, 6, 789012, tzinfo=UTC)
+    with due_user(database_url, user_id):
+        await provision(client, headers)
+        with psycopg.connect(database_url, autocommit=True) as conn:
+            conn.executemany(
+                """
+                INSERT INTO user_progress (user_id, content_id, times_seen, due_at)
+                VALUES (%s, %s, 1, %s)
+                """,
+                [
+                    (user_id, included_id, instant),
+                    (user_id, future_id, instant + timedelta(microseconds=1)),
+                ],
+            )
+
+        with fixed_utc_now(client, instant):
+            response = await client.get("/v1/study/due", headers=headers)
+
+        assert response.status_code == 200
+        assert [item["id"] for item in response.json()["items"]] == [included_id]
 
 
 async def test_due_limit_defaults_to_twenty_caps_at_fifty_and_validates_bounds(
