@@ -13,6 +13,9 @@ class Settings:
         self.database_url: str = os.getenv("DATABASE_URL", "")
         self.default_language: str = os.getenv("DEFAULT_LANGUAGE", "ibo")
         self.default_meta_language: str = os.getenv("DEFAULT_META_LANGUAGE", "eng")
+        self.supabase_jwt_secret: str = os.environ["SUPABASE_JWT_SECRET"]
+        self.supabase_project_url: str = os.environ["SUPABASE_PROJECT_URL"]
+        self.supabase_jwt_audience: str = os.getenv("SUPABASE_JWT_AUDIENCE", "authenticated")
 
         # Vercel preview deployments get their own URL per branch, so the
         # frontend origin list has to be configurable rather than hardcoded.
@@ -20,7 +23,7 @@ class Settings:
         self.cors_origins: list[str] = [o.strip() for o in raw_origins.split(",") if o.strip()]
 
         self.pool_min_size: int = int(os.getenv("DB_POOL_MIN", "1"))
-        self.pool_max_size: int = int(os.getenv("DB_POOL_MAX", "10"))
+        self.pool_max_size: int = int(os.getenv("DB_POOL_MAX", "5"))
         self.max_page_size: int = int(os.getenv("MAX_PAGE_SIZE", "200"))
 
     @property
