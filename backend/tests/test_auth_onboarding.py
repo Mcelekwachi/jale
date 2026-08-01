@@ -87,12 +87,17 @@ async def test_optional_auth_returns_none_only_when_header_is_absent(client):
         transport=ASGITransport(app=test_app), base_url="http://optional.test"
     ) as test_client:
         absent = await test_client.get("/optional")
-        invalid = await test_client.get("/optional", headers={"Authorization": "Bearer not-a-jwt"})
+        invalid_responses = [
+            await test_client.get("/optional", headers={"Authorization": authorization})
+            for authorization in ("Bearer not-a-jwt", "Basic abc", "Bearer")
+        ]
 
     assert absent.status_code == 200
     assert absent.json() == {"user": None}
-    assert invalid.status_code == 401
-    assert invalid.json() == {"detail": "Invalid authentication credentials"}
+    for invalid in invalid_responses:
+        assert invalid.status_code == 401
+        assert invalid.json() == {"detail": "Invalid authentication credentials"}
+        assert invalid.headers["www-authenticate"] == "Bearer"
 
 
 async def test_empty_configured_secret_fails_closed_with_generic_401(monkeypatch):
