@@ -834,18 +834,18 @@ async def test_streak_same_day_consecutive_day_and_gap_updates_once_per_batch(
 
 
 @pytest.mark.parametrize(
-    "daily_minutes,total_ms,expected",
+    "daily_minutes,answer_count,expected",
     [
-        (5, 299_000, False),
-        (5, 300_000, True),
-        (15, 899_000, False),
-        (15, 900_000, True),
-        (30, 1_799_000, False),
-        (30, 1_800_000, True),
+        (5, 4, False),
+        (5, 5, True),
+        (15, 14, False),
+        (15, 15, True),
+        (30, 29, False),
+        (30, 30, True),
     ],
 )
 async def test_daily_goal_thresholds(
-    client, database_url, user_id, auth_headers, daily_minutes, total_ms, expected
+    client, database_url, user_id, auth_headers, daily_minutes, answer_count, expected
 ):
     content_id = published_content_ids(database_url, 1)[0]
     headers = auth_headers(subject=user_id)
@@ -858,15 +858,7 @@ async def test_daily_goal_thresholds(
         response = await client.post(
             "/v1/study/answers",
             headers=headers,
-            json={
-                "answers": [
-                    answer(content_id, correct=True, duration_ms=duration)
-                    for duration in (
-                        [300_000] * (total_ms // 300_000)
-                        + ([total_ms % 300_000] if total_ms % 300_000 else [])
-                    )
-                ]
-            },
+            json={"answers": [answer(content_id, correct=True) for _ in range(answer_count)]},
         )
         assert response.status_code == 200
         assert activity_rows(database_url, user_id)[0][4] is expected
