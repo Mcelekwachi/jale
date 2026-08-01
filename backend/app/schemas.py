@@ -199,6 +199,10 @@ class StudySession(BaseModel):
     items: list[StudyItem]
 
 
+class DueStudyItems(BaseModel):
+    items: list[StudyItem]
+
+
 class StudyAnswer(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
