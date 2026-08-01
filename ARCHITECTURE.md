@@ -171,3 +171,16 @@ python db/seed/export_worklist.py -l ibo -t tone   # 100 rows, one blank column
 The contributor fills one column offline in Excel; you paste it back into the
 CSV on `source_key` and re-seed. `seed.py` fills `target_text_toned` when blank
 and **never blanks it once set**, so a re-seed cannot destroy their work.
+
+---
+
+## 6. Authenticated authorization boundary
+
+Every SQL operation behind `/v1/me` is scoped by the user's UUID extracted
+from a locally verified authentication token. The API never accepts a user ID
+from request input for these operations.
+
+Row-level security is intentionally deferred while the service-role API is the
+sole database client. The service role bypasses RLS, so enabling policies now
+would imply a protection boundary they do not provide. Authorization is
+therefore enforced by the API's token-derived UUID at every `/v1/me` query.
