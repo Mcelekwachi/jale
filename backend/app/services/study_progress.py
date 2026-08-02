@@ -223,13 +223,14 @@ async def record_answers(user_id: UUID, answers: list[StudyAnswer], now: datetim
             await conn.execute(
                 """INSERT INTO user_daily_activity(user_id, activity_date, items_reviewed, seconds_spent, xp, goal_met)
                      VALUES (%(user_id)s, %(today)s, %(items)s, %(seconds)s, %(xp)s,
-                             CASE WHEN %(threshold)s IS NULL THEN true ELSE %(items)s >= %(threshold)s END)
+                             CASE WHEN %(threshold)s::int IS NULL THEN true
+                                  ELSE %(items)s >= %(threshold)s::int END)
                      ON CONFLICT (user_id, activity_date) DO UPDATE SET
                        items_reviewed=user_daily_activity.items_reviewed+EXCLUDED.items_reviewed,
                        seconds_spent=user_daily_activity.seconds_spent+EXCLUDED.seconds_spent,
                        xp=user_daily_activity.xp+EXCLUDED.xp,
-                       goal_met=CASE WHEN %(threshold)s IS NULL THEN true
-                         ELSE user_daily_activity.items_reviewed+EXCLUDED.items_reviewed >= %(threshold)s END""",
+                       goal_met=CASE WHEN %(threshold)s::int IS NULL THEN true
+                         ELSE user_daily_activity.items_reviewed+EXCLUDED.items_reviewed >= %(threshold)s::int END""",
                 {
                     "user_id": user_id,
                     "today": today,
