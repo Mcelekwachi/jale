@@ -137,9 +137,15 @@ async def get_user_profile(user_id: uuid.UUID) -> dict[str, Any]:
             """
             SELECT u.id, u.email, u.display_name, u.avatar_url, u.role,
                    u.share_slug, u.is_active, u.created_at, u.last_seen_at,
-                   to_jsonb(p) AS preferences
+                   (to_jsonb(p) - 'active_language_id' - 'meta_language_id')
+                   || jsonb_build_object(
+                          'active_language', active_language.code,
+                          'meta_language', meta_language.code
+                      ) AS preferences
               FROM app_users u
               JOIN user_preferences p ON p.user_id = u.id
+              JOIN languages active_language ON active_language.id = p.active_language_id
+              LEFT JOIN languages meta_language ON meta_language.id = p.meta_language_id
              WHERE u.id = %(user_id)s
             """,
             {"user_id": user_id},

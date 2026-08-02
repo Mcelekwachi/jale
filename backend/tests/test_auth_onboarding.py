@@ -323,8 +323,8 @@ async def test_get_me_returns_profile_with_nested_preferences(
         assert profile["share_slug"]
         assert "avatar_url" in profile
         assert set(profile["preferences"]) >= {
-            "active_language_id",
-            "meta_language_id",
+            "active_language",
+            "meta_language",
             "age_band",
             "connection",
             "goal",
@@ -339,6 +339,9 @@ async def test_get_me_returns_profile_with_nested_preferences(
             "onboarding_last_screen",
             "completed_at",
         }
+        assert profile["preferences"]["active_language"] == "ibo"
+        assert profile["preferences"]["meta_language"] is None
+        assert not any(key.endswith("_language_id") for key in profile["preferences"])
         assert profile["preferences"]["onboarding_status"] == "not_started"
 
 
@@ -438,7 +441,7 @@ async def test_me_endpoints_are_scoped_only_to_each_token_subject(
 
 @pytest.mark.parametrize(
     "field",
-    ["active_language_id", "age_band", "connection", "goal", "style"],
+    ["active_language", "age_band", "connection", "goal", "style"],
 )
 async def test_patch_preferences_rejects_null_for_required_selection_fields(
     client, database_url, user_id, auth_headers, field
@@ -458,14 +461,11 @@ async def test_patch_preferences_clears_nullable_fields(
     headers = auth_headers(subject=user_id)
     with remove_test_users(database_url, user_id):
         assert (await client.get("/v1/me", headers=headers)).status_code == 200
-        with db_connection(database_url) as conn:
-            english_id = conn.execute("SELECT id FROM languages WHERE code = 'eng'").fetchone()[0]
-
         populated = await client.patch(
             "/v1/me/preferences",
             headers=headers,
             json={
-                "meta_language_id": english_id,
+                "meta_language": "eng",
                 "reminder_time": "09:30:00",
                 "placement_level": "beginner",
                 "onboarding_last_screen": 4,
@@ -477,7 +477,7 @@ async def test_patch_preferences_clears_nullable_fields(
             "/v1/me/preferences",
             headers=headers,
             json={
-                "meta_language_id": None,
+                "meta_language": None,
                 "reminder_time": None,
                 "placement_level": None,
                 "onboarding_last_screen": None,
@@ -486,31 +486,80 @@ async def test_patch_preferences_clears_nullable_fields(
 
         assert cleared.status_code == 200
         preferences = cleared.json()["preferences"]
-        assert preferences["meta_language_id"] is None
+        assert preferences["meta_language"] is None
         assert preferences["reminder_time"] is None
         assert preferences["placement_level"] is None
         assert preferences["onboarding_last_screen"] is None
 
 
-async def test_patch_preferences_accepts_meta_language_and_rejects_target_language(
+async def test_patch_preferences_resolves_meta_language_code_to_stored_id(
     client, database_url, user_id, auth_headers
 ):
     headers = auth_headers(subject=user_id)
-    with db_connection(database_url) as conn:
-        ids = dict(
-            conn.execute("SELECT code, id FROM languages WHERE code IN ('eng', 'ibo')").fetchall()
-        )
     with remove_test_users(database_url, user_id):
-        valid = await client.patch(
-            "/v1/me/preferences", headers=headers, json={"meta_language_id": ids["eng"]}
+        response = await client.patch(
+            "/v1/me/preferences", headers=headers, json={"meta_language": "nld"}
         )
-        invalid = await client.patch(
-            "/v1/me/preferences", headers=headers, json={"meta_language_id": ids["ibo"]}
-        )
+        assert response.status_code == 200
+        assert response.json()["preferences"]["meta_language"] == "nld"
+        with db_connection(database_url) as conn:
+            stored = conn.execute(
+                """
+                SELECT stored.id, language.id
+                  FROM user_preferences preferences
+                  JOIN languages stored ON stored.id = preferences.meta_language_id
+                  JOIN languages language ON language.code = 'nld'
+                 WHERE preferences.user_id = %s
+                """,
+                (user_id,),
+            ).fetchone()
+        assert stored[0] == stored[1]
 
-        assert valid.status_code == 200
-        assert valid.json()["preferences"]["meta_language_id"] == ids["eng"]
-        assert invalid.status_code == 422
+
+async def test_patch_preferences_clears_meta_language_code(
+    client, database_url, user_id, auth_headers
+):
+    headers = auth_headers(subject=user_id)
+    with remove_test_users(database_url, user_id):
+        assert (
+            await client.patch("/v1/me/preferences", headers=headers, json={"meta_language": "nld"})
+        ).status_code == 200
+        response = await client.patch(
+            "/v1/me/preferences", headers=headers, json={"meta_language": None}
+        )
+        assert response.status_code == 200
+        assert response.json()["preferences"]["meta_language"] is None
+        with db_connection(database_url) as conn:
+            stored = conn.execute(
+                "SELECT meta_language_id FROM user_preferences WHERE user_id = %s",
+                (user_id,),
+            ).fetchone()[0]
+        assert stored is None
+
+
+@pytest.mark.parametrize("code", ["ibo", "zzz"])
+async def test_patch_preferences_rejects_invalid_meta_language_codes(
+    client, database_url, user_id, auth_headers, code
+):
+    with remove_test_users(database_url, user_id):
+        response = await client.patch(
+            "/v1/me/preferences",
+            headers=auth_headers(subject=user_id),
+            json={"meta_language": code},
+        )
+        assert response.status_code == 422
+
+
+async def test_patch_preferences_rejects_non_learnable_active_language(
+    client, database_url, user_id, auth_headers
+):
+    with remove_test_users(database_url, user_id):
+        response = await client.patch(
+            "/v1/me/preferences",
+            headers=auth_headers(subject=user_id),
+            json={"active_language": "eng"},
+        )
+        assert response.status_code == 422
 
 
 async def test_complete_onboarding_is_idempotent_and_keeps_completed_at(
