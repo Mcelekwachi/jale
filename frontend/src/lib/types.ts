@@ -103,8 +103,8 @@ export interface ResolvedTrack {
 }
 
 export interface UserPreferences {
-  active_language_id: number;
-  meta_language_id?: number | null;
+  active_language: string;
+  meta_language?: string | null;
   active_dialect_id?: number | null;
   age_band?: AgeBand | null;
   connection?: Connection | null;
@@ -120,6 +120,13 @@ export interface UserPreferences {
   onboarding_last_screen?: number | null;
   completed_at?: string | null;
   updated_at: string;
+}
+
+export interface ContentPage {
+  items: ContentItem[];
+  total: number;
+  limit: number;
+  offset: number;
 }
 
 export interface UserProfile {
