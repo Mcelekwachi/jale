@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { useAuth } from "../auth/useAuth";
 import { Button } from "../components/Button";
@@ -68,13 +69,21 @@ export function Home() {
           <p className="font-display text-3xl font-bold text-indigo-deep">
             Jalɛ
           </p>
-          <Button
-            className="w-auto"
-            variant="secondary"
-            onClick={() => void signOut()}
-          >
-            Sign out
-          </Button>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/settings"
+              className="inline-flex min-h-11 items-center rounded-2xl px-3 font-semibold text-indigo-deep hover:bg-ochre-soft"
+            >
+              Settings
+            </Link>
+            <Button
+              className="w-auto"
+              variant="secondary"
+              onClick={() => void signOut()}
+            >
+              Sign out
+            </Button>
+          </div>
         </header>
         <section className="rounded-[2rem] bg-indigo-deep p-7 text-cream shadow-card">
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-ochre-pale">
