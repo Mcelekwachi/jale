@@ -5,24 +5,21 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 
-import psycopg
 import pytest
+from db_test_utils import db_connection, isolated_test_users
 
 pytestmark = pytest.mark.asyncio
 
 
 @contextmanager
 def due_user(database_url: str, user_id: uuid.UUID) -> Iterator[None]:
-    try:
+    with isolated_test_users(user_id):
         yield
-    finally:
-        with psycopg.connect(database_url, autocommit=True) as conn:
-            conn.execute("DELETE FROM app_users WHERE id = %s", (user_id,))
 
 
 @contextmanager
 def dutch_translation(database_url: str, content_id: int, text: str) -> Iterator[None]:
-    with psycopg.connect(database_url, autocommit=True) as conn:
+    with db_connection(database_url) as conn:
         dutch_id = conn.execute("SELECT id FROM languages WHERE code='nld'").fetchone()[0]
         existing = conn.execute(
             """
@@ -44,7 +41,7 @@ def dutch_translation(database_url: str, content_id: int, text: str) -> Iterator
     try:
         yield
     finally:
-        with psycopg.connect(database_url, autocommit=True) as conn:
+        with db_connection(database_url) as conn:
             conn.execute(
                 "DELETE FROM content_translations WHERE content_id=%s AND meta_language_id=%s",
                 (content_id, dutch_id),
@@ -69,7 +66,7 @@ def fixed_utc_now(client, instant: datetime) -> Iterator[None]:
 
 
 def published_rows(database_url: str, count: int) -> list[tuple[int, str, str]]:
-    with psycopg.connect(database_url) as conn:
+    with db_connection(database_url) as conn:
         rows = conn.execute(
             """
             SELECT c.id, c.target_text, ct.translation
@@ -99,7 +96,7 @@ def seed_progress(
     *,
     first_due: datetime,
 ) -> None:
-    with psycopg.connect(database_url, autocommit=True) as conn:
+    with db_connection(database_url) as conn:
         conn.executemany(
             """
             INSERT INTO user_progress (user_id, content_id, times_seen, due_at)
@@ -138,7 +135,7 @@ async def test_due_boundary_includes_exact_now_and_excludes_one_microsecond_late
     instant = datetime(2026, 2, 3, 4, 5, 6, 789012, tzinfo=UTC)
     with due_user(database_url, user_id):
         await provision(client, headers)
-        with psycopg.connect(database_url, autocommit=True) as conn:
+        with db_connection(database_url) as conn:
             conn.executemany(
                 """
                 INSERT INTO user_progress (user_id, content_id, times_seen, due_at)
@@ -198,7 +195,7 @@ async def test_due_is_user_scoped_due_ordered_and_published_only(
         seed_progress(database_url, owner_id, [future_id], first_due=now + timedelta(days=1))
         seed_progress(database_url, owner_id, [draft_id], first_due=now - timedelta(days=1))
         seed_progress(database_url, other_id, [future_id], first_due=now - timedelta(days=1))
-        with psycopg.connect(database_url, autocommit=True) as conn:
+        with db_connection(database_url) as conn:
             conn.execute("UPDATE content_items SET status='draft' WHERE id=%s", (draft_id,))
         try:
             response = await client.get(
@@ -207,7 +204,7 @@ async def test_due_is_user_scoped_due_ordered_and_published_only(
                 params={"user_id": str(other_id)},
             )
         finally:
-            with psycopg.connect(database_url, autocommit=True) as conn:
+            with db_connection(database_url) as conn:
                 conn.execute("UPDATE content_items SET status='published' WHERE id=%s", (draft_id,))
 
         assert response.status_code == 200
@@ -227,7 +224,7 @@ async def test_due_uses_token_users_stored_active_target_language(
             [content_id],
             first_due=datetime.now(UTC) - timedelta(days=1),
         )
-        with psycopg.connect(database_url, autocommit=True) as conn:
+        with db_connection(database_url) as conn:
             english_id = conn.execute("SELECT id FROM languages WHERE code='eng'").fetchone()[0]
             conn.execute(
                 "UPDATE user_preferences SET active_language_id=%s WHERE user_id=%s",

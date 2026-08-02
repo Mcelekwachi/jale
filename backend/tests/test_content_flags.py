@@ -5,8 +5,8 @@ import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-import psycopg
 import pytest
+from db_test_utils import db_connection, isolated_test_users
 from psycopg import sql
 
 pytestmark = pytest.mark.asyncio
@@ -24,23 +24,19 @@ FLAG_FIELDS = {
 
 @contextmanager
 def flag_users(database_url: str, *user_ids: uuid.UUID) -> Iterator[None]:
-    try:
+    with isolated_test_users(*user_ids):
         yield
-    finally:
-        with psycopg.connect(database_url, autocommit=True) as conn:
-            conn.execute("DELETE FROM content_flags WHERE user_id = ANY(%s)", (list(user_ids),))
-            conn.execute("DELETE FROM app_users WHERE id = ANY(%s)", (list(user_ids),))
 
 
 def published_content_id(database_url: str) -> int:
-    with psycopg.connect(database_url) as conn:
+    with db_connection(database_url) as conn:
         return conn.execute(
             "SELECT id FROM content_items WHERE status='published' ORDER BY id LIMIT 1"
         ).fetchone()[0]
 
 
 def stored_flags(database_url: str, content_id: int, *user_ids: uuid.UUID) -> list[tuple]:
-    with psycopg.connect(database_url) as conn:
+    with db_connection(database_url) as conn:
         return conn.execute(
             """
             SELECT f.id, f.user_id, l.code, f.reason::text, f.note, f.status::text
@@ -54,7 +50,7 @@ def stored_flags(database_url: str, content_id: int, *user_ids: uuid.UUID) -> li
 
 
 def flag_count(database_url: str, content_id: int) -> int:
-    with psycopg.connect(database_url) as conn:
+    with db_connection(database_url) as conn:
         return conn.execute(
             "SELECT flag_count FROM content_items WHERE id=%s", (content_id,)
         ).fetchone()[0]
@@ -67,7 +63,7 @@ def force_flag_insert_overlap(
     suffix = uuid.uuid4().hex
     function_name = f"test_flag_overlap_{suffix}_fn"
     trigger_name = f"test_flag_overlap_{suffix}"
-    with psycopg.connect(database_url, autocommit=True) as conn:
+    with db_connection(database_url) as conn:
         conn.execute(
             sql.SQL(
                 """
@@ -87,7 +83,7 @@ def force_flag_insert_overlap(
             )
         )
     try:
-        with psycopg.connect(database_url, autocommit=True) as conn:
+        with db_connection(database_url) as conn:
             conn.execute(
                 sql.SQL(
                     "CREATE TRIGGER {} BEFORE INSERT ON content_flags "
@@ -96,7 +92,7 @@ def force_flag_insert_overlap(
             )
         yield
     finally:
-        with psycopg.connect(database_url, autocommit=True) as conn:
+        with db_connection(database_url) as conn:
             conn.execute(
                 sql.SQL("DROP TRIGGER IF EXISTS {} ON content_flags").format(
                     sql.Identifier(trigger_name)

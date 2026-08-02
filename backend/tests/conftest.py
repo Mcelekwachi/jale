@@ -20,9 +20,9 @@ from pathlib import Path
 from typing import Any
 
 import jwt
-import psycopg
 import pytest
 import pytest_asyncio
+from db_test_utils import db_connection, pending_user_cleanup
 from httpx import ASGITransport, AsyncClient
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -35,8 +35,27 @@ _TEST_JWT_AUDIENCE = "authenticated"
 os.environ["SUPABASE_JWT_SECRET"] = _TEST_JWT_SECRET
 os.environ["SUPABASE_JWT_AUDIENCE"] = _TEST_JWT_AUDIENCE
 os.environ["SUPABASE_PROJECT_URL"] = "https://test-project.supabase.co"
+os.environ["PGOPTIONS"] = "-c lock_timeout=5s -c statement_timeout=10s"
 
 pytest_plugins = ("pytest_asyncio",)
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def cleanup_test_users(database_url: str):
+    """Close API connections before bounded user-row teardown."""
+    pending_user_cleanup.clear()
+    yield
+
+    from app.db import close_pool
+
+    await close_pool()
+    if pending_user_cleanup:
+        with db_connection(database_url) as conn:
+            conn.execute(
+                "DELETE FROM app_users WHERE id = ANY(%s)",
+                (list(pending_user_cleanup),),
+            )
+    pending_user_cleanup.clear()
 
 
 @pytest.fixture
@@ -93,7 +112,7 @@ def database_url() -> str:
 @pytest.fixture(scope="session", autouse=True)
 def seeded_database(database_url: str) -> str:
     """Apply schema.sql and seed Igbo content once per test session."""
-    with psycopg.connect(database_url, autocommit=True) as conn:
+    with db_connection(database_url) as conn:
         already = conn.execute("SELECT to_regclass('public.content_items') IS NOT NULL").fetchone()[
             0
         ]
@@ -113,7 +132,7 @@ def seeded_database(database_url: str) -> str:
 
 
 @pytest_asyncio.fixture
-async def client(seeded_database: str):
+async def client(seeded_database: str, cleanup_test_users: None):
     os.environ.setdefault("APP_ENV", "test")
     from app.db import close_pool
     from app.main import create_app

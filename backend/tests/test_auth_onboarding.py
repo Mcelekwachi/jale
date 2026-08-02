@@ -11,8 +11,8 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 
-import psycopg
 import pytest
+from db_test_utils import db_connection, isolated_test_users
 from fastapi import Depends, FastAPI
 from httpx import ASGITransport, AsyncClient
 
@@ -22,15 +22,12 @@ pytestmark = pytest.mark.asyncio
 @contextmanager
 def remove_test_users(database_url: str, *user_ids: uuid.UUID) -> Iterator[None]:
     """Commit cleanup so the API pool and later tests see isolated state."""
-    try:
+    with isolated_test_users(*user_ids):
         yield
-    finally:
-        with psycopg.connect(database_url, autocommit=True) as conn:
-            conn.execute("DELETE FROM app_users WHERE id = ANY(%s)", (list(user_ids),))
 
 
 def auth_row_counts(database_url: str, user_id: uuid.UUID) -> tuple[int, int, int]:
-    with psycopg.connect(database_url) as conn:
+    with db_connection(database_url) as conn:
         return conn.execute(
             """
             SELECT
@@ -162,7 +159,7 @@ async def test_first_authenticated_request_provisions_each_user_row_once(
         assert first.json()["display_name"] == "New Learner"
         assert auth_row_counts(database_url, user_id) == (1, 1, 1)
 
-        with psycopg.connect(database_url) as conn:
+        with db_connection(database_url) as conn:
             preferences = conn.execute(
                 """
                 SELECT l.code, p.meta_language_id
@@ -230,7 +227,7 @@ async def test_top_level_identity_claims_are_used_when_metadata_is_absent(
         assert response.status_code == 200
         assert response.json()["display_name"] == "Top Level Name"
         assert response.json()["avatar_url"] == avatar_url
-        with psycopg.connect(database_url) as conn:
+        with db_connection(database_url) as conn:
             stored = conn.execute(
                 "SELECT display_name, avatar_url FROM app_users WHERE id = %s", (user_id,)
             ).fetchone()
@@ -244,26 +241,26 @@ async def test_last_seen_advances_only_when_missing_or_older_than_one_hour(
     old_time = datetime.now(UTC) - timedelta(hours=2)
     with remove_test_users(database_url, user_id):
         assert (await client.get("/v1/me", headers=headers)).status_code == 200
-        with psycopg.connect(database_url) as conn:
+        with db_connection(database_url) as conn:
             initial = conn.execute(
                 "SELECT last_seen_at FROM app_users WHERE id = %s", (user_id,)
             ).fetchone()[0]
         assert initial is not None
 
-        with psycopg.connect(database_url, autocommit=True) as conn:
+        with db_connection(database_url) as conn:
             conn.execute(
                 "UPDATE app_users SET last_seen_at = %s WHERE id = %s", (old_time, user_id)
             )
 
         assert (await client.get("/v1/me", headers=headers)).status_code == 200
-        with psycopg.connect(database_url) as conn:
+        with db_connection(database_url) as conn:
             advanced = conn.execute(
                 "SELECT last_seen_at FROM app_users WHERE id = %s", (user_id,)
             ).fetchone()[0]
         assert advanced > old_time
 
         assert (await client.get("/v1/me", headers=headers)).status_code == 200
-        with psycopg.connect(database_url) as conn:
+        with db_connection(database_url) as conn:
             unchanged = conn.execute(
                 "SELECT last_seen_at FROM app_users WHERE id = %s", (user_id,)
             ).fetchone()[0]
@@ -290,7 +287,7 @@ async def test_require_admin_rejects_learner_and_accepts_database_admin(
             learner = await test_client.get("/admin-test", headers=headers)
             assert learner.status_code == 403
 
-            with psycopg.connect(database_url, autocommit=True) as conn:
+            with db_connection(database_url) as conn:
                 conn.execute("UPDATE app_users SET role = 'admin' WHERE id = %s", (user_id,))
 
             admin = await test_client.get("/admin-test", headers=headers)
@@ -461,7 +458,7 @@ async def test_patch_preferences_clears_nullable_fields(
     headers = auth_headers(subject=user_id)
     with remove_test_users(database_url, user_id):
         assert (await client.get("/v1/me", headers=headers)).status_code == 200
-        with psycopg.connect(database_url) as conn:
+        with db_connection(database_url) as conn:
             english_id = conn.execute("SELECT id FROM languages WHERE code = 'eng'").fetchone()[0]
 
         populated = await client.patch(
@@ -499,7 +496,7 @@ async def test_patch_preferences_accepts_meta_language_and_rejects_target_langua
     client, database_url, user_id, auth_headers
 ):
     headers = auth_headers(subject=user_id)
-    with psycopg.connect(database_url) as conn:
+    with db_connection(database_url) as conn:
         ids = dict(
             conn.execute("SELECT code, id FROM languages WHERE code IN ('eng', 'ibo')").fetchall()
         )
