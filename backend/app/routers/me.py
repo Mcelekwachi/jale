@@ -16,7 +16,8 @@ from app.schemas import (
     patch_values,
 )
 from app.services import track_resolver
-from app.services.meta_languages import validate_meta_language_id
+from app.services.languages import resolve_learnable_language_id
+from app.services.meta_languages import resolve_meta_language_id
 from app.services.study_progress import get_stats, get_utc_now
 from app.services.users import (
     complete_onboarding,
@@ -71,8 +72,15 @@ async def patch_preferences(
     user: Annotated[dict, Depends(current_user)],
 ) -> dict:
     changes = patch_values(payload)
-    if changes.get("meta_language_id") is not None:
-        await validate_meta_language_id(changes["meta_language_id"])
+    if "active_language" in changes:
+        changes["active_language_id"] = await resolve_learnable_language_id(
+            changes.pop("active_language")
+        )
+    if "meta_language" in changes:
+        code = changes.pop("meta_language")
+        changes["meta_language_id"] = (
+            await resolve_meta_language_id(code) if code is not None else None
+        )
     return await update_preferences(_user_id(user), changes)
 
 

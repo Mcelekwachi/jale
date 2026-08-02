@@ -99,6 +99,8 @@ async def test_health_db_reports_seeded_content(client):
     assert body["status"] == "ok"
     assert body["content_items"] == 157
     assert body["tracks"] == 6
+    assert body["learnable_languages"] == 1
+    assert "active_languages" not in body
 
 
 # --- languages and categories ----------------------------------------------

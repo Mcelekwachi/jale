@@ -28,7 +28,7 @@ async def health_db(response: Response) -> dict:
             """
             SELECT (SELECT count(*) FROM content_items WHERE status='published') AS content,
                    (SELECT count(*) FROM tracks) AS tracks,
-                   (SELECT count(*) FROM languages WHERE is_active) AS languages
+                   (SELECT count(*) FROM languages WHERE is_learnable) AS languages
             """
         )
     except Exception as exc:  # noqa: BLE001 — surfaced as an unhealthy response
@@ -42,5 +42,5 @@ async def health_db(response: Response) -> dict:
         "status": "ok" if seeded else "not_seeded",
         "content_items": row["content"] if row else 0,
         "tracks": row["tracks"] if row else 0,
-        "active_languages": row["languages"] if row else 0,
+        "learnable_languages": row["languages"] if row else 0,
     }

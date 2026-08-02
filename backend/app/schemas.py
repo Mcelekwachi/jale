@@ -277,8 +277,8 @@ class UserStats(BaseModel):
 
 
 class UserPreferences(BaseModel):
-    active_language_id: int
-    meta_language_id: int | None = None
+    active_language: str
+    meta_language: str | None = None
     active_dialect_id: int | None = None
     age_band: AgeBand | None = None
     connection: Connection | None = None
@@ -321,8 +321,8 @@ class PublicProfile(BaseModel):
 class PreferencesPatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    active_language_id: int | None = None
-    meta_language_id: int | None = None
+    active_language: str | None = None
+    meta_language: str | None = None
     age_band: AgeBand | None = None
     connection: Connection | None = None
     goal: Goal | None = None
@@ -347,7 +347,7 @@ class PreferencesPatch(BaseModel):
     @model_validator(mode="after")
     def reject_null_required_selections(self) -> PreferencesPatch:
         cannot_clear = {
-            "active_language_id",
+            "active_language",
             "age_band",
             "connection",
             "goal",
