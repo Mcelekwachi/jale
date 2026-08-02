@@ -256,10 +256,15 @@ async def test_three_accepted_answers_update_progress_and_batch_totals_atomicall
             json={"answers": submitted},
         )
         after = datetime.now(UTC)
+        with db_connection(database_url) as conn:
+            daily_minutes = conn.execute(
+                "SELECT daily_minutes FROM user_preferences WHERE user_id=%s", (user_id,)
+            ).fetchone()[0]
         rows = progress_rows(database_url, user_id)
         activity = activity_rows(database_url, user_id)
 
     assert response.status_code == 200
+    assert daily_minutes is None
     body = response.json()
     assert body["accepted_count"] == 3
     assert body["skipped_count"] == 0
@@ -275,7 +280,7 @@ async def test_three_accepted_answers_update_progress_and_batch_totals_atomicall
     assert before + timedelta(minutes=10) <= rows[ids[1]][4] <= after + timedelta(minutes=10)
     assert before + timedelta(days=1) <= rows[ids[2]][4] <= after + timedelta(days=1)
     assert len(activity) == 1
-    assert activity[0][1:] == (3, 3, 22, False)
+    assert activity[0][1:] == (3, 3, 22, True)
     assert body["today_xp"] == 22
 
 
