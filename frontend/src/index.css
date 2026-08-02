@@ -1,0 +1,68 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif:wght@600;700&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --color-warm: #f5efe4;
+  --color-cream: #fffaf0;
+  --color-white: #ffffff;
+  --color-ink: #292231;
+  --color-muted: #6c6373;
+  --color-indigo-deep: #2f234f;
+  --color-indigo-rich: #43316f;
+  --color-lavender: #d9d0ed;
+  --color-ochre: #c58a2c;
+  --color-ochre-soft: #f3dfb9;
+  --color-ochre-pale: #f5d995;
+  --color-sand: #dfd2bd;
+  --color-terracotta: #b5553e;
+  --color-terracotta-dark: #7d3527;
+  --color-terracotta-soft: #f7ded6;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Noto Serif", ui-serif, Georgia, serif;
+  --shadow-card: 0 18px 50px rgb(47 35 79 / 0.12);
+}
+
+:root {
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background: var(--color-warm);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100dvh;
+}
+button,
+input {
+  font: inherit;
+}
+
+.startup-error {
+  max-width: 36rem;
+  margin: 4rem auto;
+  padding: 2rem;
+  border-radius: 1.5rem;
+  background: var(--color-cream);
+  box-shadow: var(--shadow-card);
+}
+.startup-error h1 {
+  font-family: var(--font-display);
+  color: var(--color-indigo-deep);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
