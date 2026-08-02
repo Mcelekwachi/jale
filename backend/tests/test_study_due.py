@@ -96,8 +96,8 @@ def seed_progress(
     *,
     first_due: datetime,
 ) -> None:
-    with db_connection(database_url) as conn:
-        conn.executemany(
+    with db_connection(database_url) as conn, conn.cursor() as cur:
+        cur.executemany(
             """
             INSERT INTO user_progress (user_id, content_id, times_seen, due_at)
             VALUES (%s, %s, 1, %s)
@@ -135,8 +135,8 @@ async def test_due_boundary_includes_exact_now_and_excludes_one_microsecond_late
     instant = datetime(2026, 2, 3, 4, 5, 6, 789012, tzinfo=UTC)
     with due_user(database_url, user_id):
         await provision(client, headers)
-        with db_connection(database_url) as conn:
-            conn.executemany(
+        with db_connection(database_url) as conn, conn.cursor() as cur:
+            cur.executemany(
                 """
                 INSERT INTO user_progress (user_id, content_id, times_seen, due_at)
                 VALUES (%s, %s, 1, %s)

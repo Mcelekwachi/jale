@@ -880,6 +880,11 @@ async def test_null_daily_goal_is_met_by_any_accepted_activity(
     headers = auth_headers(subject=user_id)
     with study_user(database_url, user_id):
         await provision(client, headers)
+        with db_connection(database_url) as conn:
+            daily_minutes = conn.execute(
+                "SELECT daily_minutes FROM user_preferences WHERE user_id=%s", (user_id,)
+            ).fetchone()[0]
+        assert daily_minutes is None
         response = await client.post(
             "/v1/study/answers",
             headers=headers,
@@ -923,17 +928,18 @@ async def test_me_stats_uses_local_today_for_totals_and_last_30_dates(
                 """,
                 (local_today, user_id),
             )
-            conn.executemany(
-                """
-                INSERT INTO user_daily_activity
-                    (user_id, activity_date, items_reviewed, seconds_spent, xp, goal_met)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                """,
-                [
-                    (user_id, day, index + 1, 60, 10, day == local_today)
-                    for index, day in enumerate(dates)
-                ],
-            )
+            with conn.cursor() as cur:
+                cur.executemany(
+                    """
+                    INSERT INTO user_daily_activity
+                        (user_id, activity_date, items_reviewed, seconds_spent, xp, goal_met)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    """,
+                    [
+                        (user_id, day, index + 1, 60, 10, day == local_today)
+                        for index, day in enumerate(dates)
+                    ],
+                )
         response = await client.get(
             "/v1/me/stats", headers=headers, params={"user_id": str(uuid.uuid4())}
         )

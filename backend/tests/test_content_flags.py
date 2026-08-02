@@ -25,7 +25,11 @@ FLAG_FIELDS = {
 @contextmanager
 def flag_users(database_url: str, *user_ids: uuid.UUID) -> Iterator[None]:
     with isolated_test_users(*user_ids):
-        yield
+        try:
+            yield
+        finally:
+            with db_connection(database_url) as conn:
+                conn.execute("DELETE FROM content_flags WHERE user_id=ANY(%s)", (list(user_ids),))
 
 
 def published_content_id(database_url: str) -> int:
