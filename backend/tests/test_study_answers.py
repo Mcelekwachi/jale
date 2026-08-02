@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 
 import psycopg
 import pytest
+from db_test_utils import db_connection, isolated_test_users
 from psycopg import sql
 
 pytestmark = pytest.mark.asyncio
@@ -15,15 +16,12 @@ pytestmark = pytest.mark.asyncio
 
 @contextmanager
 def study_user(database_url: str, user_id: uuid.UUID) -> Iterator[None]:
-    try:
+    with isolated_test_users(user_id):
         yield
-    finally:
-        with psycopg.connect(database_url, autocommit=True) as conn:
-            conn.execute("DELETE FROM app_users WHERE id = %s", (user_id,))
 
 
 def published_content_ids(database_url: str, count: int = 3) -> list[int]:
-    with psycopg.connect(database_url) as conn:
+    with db_connection(database_url) as conn:
         rows = conn.execute(
             "SELECT id FROM content_items WHERE status = 'published' ORDER BY id LIMIT %s",
             (count,),
@@ -52,7 +50,7 @@ def answer(
 
 
 def progress_rows(database_url: str, user_id: uuid.UUID) -> dict[int, tuple]:
-    with psycopg.connect(database_url) as conn:
+    with db_connection(database_url) as conn:
         rows = conn.execute(
             """
             SELECT content_id, times_seen, times_correct, times_incorrect,
@@ -67,7 +65,7 @@ def progress_rows(database_url: str, user_id: uuid.UUID) -> dict[int, tuple]:
 
 
 def activity_rows(database_url: str, user_id: uuid.UUID) -> list[tuple]:
-    with psycopg.connect(database_url) as conn:
+    with db_connection(database_url) as conn:
         return conn.execute(
             """
             SELECT activity_date, items_reviewed, seconds_spent, xp, goal_met
@@ -98,14 +96,14 @@ def fixed_utc_now(client, instant: datetime) -> Iterator[None]:
 
 def drop_progress_trigger(database_url: str, trigger: str, function: str) -> None:
     try:
-        with psycopg.connect(database_url, autocommit=True) as conn:
+        with db_connection(database_url) as conn:
             conn.execute(
                 sql.SQL("DROP TRIGGER IF EXISTS {} ON user_progress").format(
                     sql.Identifier(trigger)
                 )
             )
     finally:
-        with psycopg.connect(database_url, autocommit=True) as conn:
+        with db_connection(database_url) as conn:
             conn.execute(sql.SQL("DROP FUNCTION IF EXISTS {}()").format(sql.Identifier(function)))
 
 
@@ -171,7 +169,7 @@ async def test_empty_batch_is_a_read_only_no_op(client, database_url, user_id, a
     headers = auth_headers(subject=user_id)
     with fixed_utc_now(client, instant), study_user(database_url, user_id):
         await provision(client, headers)
-        with psycopg.connect(database_url, autocommit=True) as conn:
+        with db_connection(database_url) as conn:
             conn.execute(
                 """
                 UPDATE user_stats
@@ -201,7 +199,7 @@ async def test_empty_batch_is_a_read_only_no_op(client, database_url, user_id, a
         assert response.json()["current_streak"] == 4
         assert response.json()["today_xp"] == 34
         assert activity_rows(database_url, user_id) == before_activity
-        with psycopg.connect(database_url) as conn:
+        with db_connection(database_url) as conn:
             stats = conn.execute(
                 """
                 SELECT current_streak, longest_streak, total_items_seen,
@@ -339,7 +337,7 @@ async def test_leitner_intervals_cap_at_five_and_incorrect_resets_to_zero(
         )
         after_incorrect = datetime.now(UTC)
         stored = progress_rows(database_url, user_id)[content_id]
-        with psycopg.connect(database_url) as conn:
+        with db_connection(database_url) as conn:
             stats = conn.execute(
                 """
                 SELECT total_items_seen, total_mastered, total_xp
@@ -368,7 +366,7 @@ async def test_unknown_and_unpublished_content_are_reported_in_order_and_skipped
     unknown_id = 9_223_372_036_854_775_000
     submitted_ids = [unknown_id, published_id, unpublished_id]
     with study_user(database_url, user_id):
-        with psycopg.connect(database_url, autocommit=True) as conn:
+        with db_connection(database_url) as conn:
             conn.execute(
                 "UPDATE content_items SET status = 'draft' WHERE id = %s", (unpublished_id,)
             )
@@ -380,7 +378,7 @@ async def test_unknown_and_unpublished_content_are_reported_in_order_and_skipped
             )
             rows = progress_rows(database_url, user_id)
         finally:
-            with psycopg.connect(database_url, autocommit=True) as conn:
+            with db_connection(database_url) as conn:
                 conn.execute(
                     "UPDATE content_items SET status = 'published' WHERE id = %s", (unpublished_id,)
                 )
@@ -511,7 +509,7 @@ async def test_idempotency_receipt_does_not_depend_on_original_content_row(
 
     with study_user(database_url, user_id):
         await provision(client, headers)
-        with psycopg.connect(database_url, autocommit=True) as conn:
+        with db_connection(database_url) as conn:
             assert (
                 conn.execute(
                     "SELECT 1 FROM content_items WHERE id = %s", (absent_content_id,)
@@ -548,7 +546,7 @@ async def test_batches_without_accepted_answers_do_not_touch_activity_or_streak(
     answer_id = uuid.uuid4()
     with study_user(database_url, user_id):
         await provision(client, headers)
-        with psycopg.connect(database_url, autocommit=True) as conn:
+        with db_connection(database_url) as conn:
             conn.execute(
                 "UPDATE user_stats SET current_streak=6, longest_streak=8 WHERE user_id=%s",
                 (user_id,),
@@ -561,7 +559,7 @@ async def test_batches_without_accepted_answers_do_not_touch_activity_or_streak(
                 json={"answers": [original]},
             )
             assert first.status_code == 200
-            with psycopg.connect(database_url, autocommit=True) as conn:
+            with db_connection(database_url) as conn:
                 conn.execute(
                     "UPDATE user_stats SET current_streak=6, longest_streak=8 WHERE user_id=%s",
                     (user_id,),
@@ -593,7 +591,7 @@ async def test_mid_batch_database_failure_rolls_back_all_answer_side_effects(
     with study_user(database_url, user_id):
         await provision(client, headers)
         try:
-            with psycopg.connect(database_url, autocommit=True) as conn:
+            with db_connection(database_url) as conn:
                 conn.execute(
                     sql.SQL(
                         """
@@ -662,7 +660,7 @@ async def test_mid_batch_database_failure_rolls_back_all_answer_side_effects(
         assert rows[first_content][:3] == (1, 1, 0)
         assert rows[failing_content][:3] == (1, 1, 0)
         assert activity_rows(database_url, user_id)[0][1:4] == (2, 0, 20)
-        with psycopg.connect(database_url) as conn:
+        with db_connection(database_url) as conn:
             stats = conn.execute(
                 """
                 SELECT current_streak, longest_streak, total_items_seen,
@@ -683,7 +681,7 @@ async def test_concurrent_reversed_batches_finish_without_deadlock_and_keep_all_
     function = f"{trigger}_fn"
     with study_user(database_url, user_id):
         try:
-            with psycopg.connect(database_url, autocommit=True) as conn:
+            with db_connection(database_url) as conn:
                 conn.execute(
                     sql.SQL(
                         """
@@ -703,8 +701,8 @@ async def test_concurrent_reversed_batches_finish_without_deadlock_and_keep_all_
                         "FOR EACH ROW EXECUTE FUNCTION {}()"
                     ).format(sql.Identifier(trigger), sql.Identifier(function))
                 )
-            responses = await asyncio.wait_for(
-                asyncio.gather(
+            tasks = [
+                asyncio.create_task(
                     client.post(
                         "/v1/study/answers",
                         headers=headers,
@@ -714,7 +712,9 @@ async def test_concurrent_reversed_batches_finish_without_deadlock_and_keep_all_
                                 answer(second_content, correct=False),
                             ]
                         },
-                    ),
+                    )
+                ),
+                asyncio.create_task(
                     client.post(
                         "/v1/study/answers",
                         headers=headers,
@@ -724,12 +724,21 @@ async def test_concurrent_reversed_batches_finish_without_deadlock_and_keep_all_
                                 answer(first_content, correct=False),
                             ]
                         },
-                    ),
+                    )
                 ),
-                timeout=10,
-            )
+            ]
+            try:
+                responses = await asyncio.wait_for(
+                    asyncio.gather(*tasks, return_exceptions=True), timeout=10
+                )
+            finally:
+                for task in tasks:
+                    if not task.done():
+                        task.cancel()
+                await asyncio.gather(*tasks, return_exceptions=True)
         finally:
             drop_progress_trigger(database_url, trigger, function)
+        assert all(not isinstance(response, BaseException) for response in responses), responses
         assert [response.status_code for response in responses] == [200, 200]
         rows = progress_rows(database_url, user_id)
         assert rows[first_content][:3] == (2, 1, 1)
@@ -790,7 +799,7 @@ async def test_streak_same_day_consecutive_day_and_gap_updates_once_per_batch(
             json={"timezone": "America/Los_Angeles"},
         )
         assert patched.status_code == 200
-        with psycopg.connect(database_url, autocommit=True) as conn:
+        with db_connection(database_url) as conn:
             conn.execute(
                 """
                 UPDATE user_stats
@@ -809,7 +818,7 @@ async def test_streak_same_day_consecutive_day_and_gap_updates_once_per_batch(
             headers=headers,
             json={"answers": [answer(content_id, correct=True)]},
         )
-        with psycopg.connect(database_url, autocommit=True) as conn:
+        with db_connection(database_url) as conn:
             conn.execute(
                 "UPDATE user_stats SET last_activity_date = %s WHERE user_id = %s",
                 (local_today - timedelta(days=3), user_id),
@@ -821,7 +830,7 @@ async def test_streak_same_day_consecutive_day_and_gap_updates_once_per_batch(
             json={"answers": [answer(content_id, correct=False)]},
         )
 
-        with psycopg.connect(database_url) as conn:
+        with db_connection(database_url) as conn:
             stats = conn.execute(
                 "SELECT current_streak, longest_streak FROM user_stats WHERE user_id = %s",
                 (user_id,),
@@ -899,7 +908,7 @@ async def test_me_stats_uses_local_today_for_totals_and_last_30_dates(
             "/v1/me/preferences", headers=headers, json={"timezone": timezone}
         )
         assert patched.status_code == 200
-        with psycopg.connect(database_url, autocommit=True) as conn:
+        with db_connection(database_url) as conn:
             dates = [
                 local_today - timedelta(days=30),
                 local_today - timedelta(days=29),

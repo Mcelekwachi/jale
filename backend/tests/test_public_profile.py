@@ -5,8 +5,8 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 
-import psycopg
 import pytest
+from db_test_utils import db_connection, isolated_test_users
 
 pytestmark = pytest.mark.asyncio
 
@@ -22,11 +22,8 @@ PUBLIC_PROFILE_FIELDS = {
 
 @contextmanager
 def profile_user(database_url: str, user_id: uuid.UUID) -> Iterator[None]:
-    try:
+    with isolated_test_users(user_id):
         yield
-    finally:
-        with psycopg.connect(database_url, autocommit=True) as conn:
-            conn.execute("DELETE FROM app_users WHERE id=%s", (user_id,))
 
 
 async def provision(client, headers: dict[str, str]) -> dict:
@@ -47,7 +44,7 @@ async def test_public_profile_returns_only_privacy_safe_summary(
     with profile_user(database_url, user_id):
         profile = await provision(client, headers)
         share_slug = profile["share_slug"]
-        with psycopg.connect(database_url, autocommit=True) as conn:
+        with db_connection(database_url) as conn:
             igbo_id = conn.execute("SELECT id FROM languages WHERE code='ibo'").fetchone()[0]
             conn.execute(
                 """
@@ -103,7 +100,7 @@ async def test_unknown_and_inactive_profiles_are_indistinguishable(
     with profile_user(database_url, user_id):
         share_slug = (await provision(client, headers))["share_slug"]
         unknown = await client.get(f"/v1/profile/missing-{uuid.uuid4().hex}")
-        with psycopg.connect(database_url, autocommit=True) as conn:
+        with db_connection(database_url) as conn:
             conn.execute("UPDATE app_users SET is_active=false WHERE id=%s", (user_id,))
         inactive = await client.get(f"/v1/profile/{share_slug}")
 

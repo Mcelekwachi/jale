@@ -6,6 +6,7 @@ from contextlib import contextmanager
 
 import psycopg
 import pytest
+from db_test_utils import db_connection
 
 pytestmark = pytest.mark.asyncio
 
@@ -16,7 +17,7 @@ def committed_dutch_translations(
 ) -> Iterator[None]:
     """Expose temporary translations to the API pool, then remove only those rows."""
     content_ids = [row[0] for row in rows]
-    with psycopg.connect(database_url, autocommit=True) as conn:
+    with db_connection(database_url) as conn:
         dutch_id = conn.execute("SELECT id FROM languages WHERE code = 'nld'").fetchone()[0]
         try:
             for content_id, translation, literal_translation, cultural_note in rows:
@@ -49,7 +50,7 @@ def committed_dutch_translations(
 def select_content_rows(
     database_url: str, selector: str = "TRUE", expected_count: int = 1
 ) -> list[tuple]:
-    with psycopg.connect(database_url) as conn:
+    with db_connection(database_url) as conn:
         rows = conn.execute(
             f"""
             SELECT c.id, c.target_text, ct.translation,
@@ -282,7 +283,7 @@ async def test_search_uses_the_resolved_dutch_translation(client, database_url):
 
 
 async def test_seeded_translation_counts(database_url):
-    with psycopg.connect(database_url) as conn:
+    with db_connection(database_url) as conn:
         rows = conn.execute(
             """
             SELECT l.code, count(ct.content_id)
@@ -299,7 +300,7 @@ async def test_seeded_translation_counts(database_url):
 async def test_meta_language_coverage_counts_only_published_content(client, database_url):
     published = select_content_row(database_url)
     draft_key = f"test:draft:{uuid.uuid4()}"
-    with psycopg.connect(database_url, autocommit=True) as conn:
+    with db_connection(database_url) as conn:
         dutch_id = conn.execute("SELECT id FROM languages WHERE code = 'nld'").fetchone()[0]
         igbo_id = conn.execute("SELECT id FROM languages WHERE code = 'ibo'").fetchone()[0]
         draft_id = None
@@ -360,7 +361,7 @@ async def test_meta_language_coverage_ignores_empty_translation_rows(client, dat
     assert baseline_response.status_code == 200
     baseline = next(row for row in baseline_response.json() if row["code"] == "nld")
 
-    with psycopg.connect(database_url, autocommit=True) as conn:
+    with db_connection(database_url) as conn:
         dutch_id = conn.execute("SELECT id FROM languages WHERE code = 'nld'").fetchone()[0]
         try:
             conn.execute(
@@ -393,7 +394,7 @@ async def test_meta_language_coverage_excludes_meta_only_target_content(client, 
     assert baseline_response.status_code == 200
     baseline = next(row for row in baseline_response.json() if row["code"] == "eng")
 
-    with psycopg.connect(database_url, autocommit=True) as conn:
+    with db_connection(database_url) as conn:
         english = conn.execute(
             "SELECT id, is_learnable, is_meta FROM languages WHERE code = 'eng'"
         ).fetchone()
@@ -431,7 +432,7 @@ async def test_meta_language_coverage_excludes_meta_only_target_content(client, 
 
 async def test_english_proverb_translation_requires_a_cultural_note(database_url):
     unique_key = f"test:proverb:{uuid.uuid4()}"
-    with psycopg.connect(database_url) as conn:
+    with db_connection(database_url, autocommit=False) as conn:
         try:
             content_id = conn.execute(
                 """
@@ -460,7 +461,7 @@ async def test_english_proverb_translation_requires_a_cultural_note(database_url
 
 async def test_open_flags_are_unique_per_item_and_translation_scope(database_url):
     user_id = uuid.uuid4()
-    with psycopg.connect(database_url) as conn:
+    with db_connection(database_url, autocommit=False) as conn:
         try:
             conn.execute(
                 "INSERT INTO app_users (id, email) VALUES (%s, %s)",
@@ -613,7 +614,7 @@ async def test_study_direction_defaults_to_target_then_swaps_prompt_and_answer(
     reverse_items = {item["id"]: item for item in reverse.json()["items"]}
     assert default_items, "default direction returned no study items"
     assert default_items.keys() == reverse_items.keys()
-    with psycopg.connect(database_url) as conn:
+    with db_connection(database_url) as conn:
         seeded = {
             row[0]: {"target_text": row[1], "translation": row[2]}
             for row in conn.execute(
@@ -656,7 +657,7 @@ async def test_quiz_options_follow_answer_side_and_each_rows_fallback_language(
     selected_id = baseline_items[0]["id"]
     session_ids = [item["id"] for item in baseline_items]
 
-    with psycopg.connect(database_url) as conn:
+    with db_connection(database_url) as conn:
         selected_type = conn.execute(
             "SELECT content_type FROM content_items WHERE id = %s", (selected_id,)
         ).fetchone()[0]
