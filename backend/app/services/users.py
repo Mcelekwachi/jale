@@ -59,6 +59,7 @@ async def provision_user(claims: dict[str, Any]) -> dict[str, Any]:
     elif len(avatar_url) > 2048:
         avatar_url = avatar_url[:2048]
     settings = get_settings()
+    role = "admin" if settings.is_admin_email(email) else "learner"
 
     async with get_pool().connection() as conn, conn.transaction():
         language_cursor = await conn.execute(
@@ -81,7 +82,7 @@ async def provision_user(claims: dict[str, Any]) -> dict[str, Any]:
                     (id, email, display_name, avatar_url, role, share_slug, last_seen_at)
                 VALUES
                     (%(id)s, %(email)s, %(display_name)s, %(avatar_url)s,
-                     'learner', %(slug)s, now())
+                     %(role)s::user_role, %(slug)s, now())
                 ON CONFLICT DO NOTHING
                 RETURNING id
                 """,
@@ -91,6 +92,7 @@ async def provision_user(claims: dict[str, Any]) -> dict[str, Any]:
                     "display_name": display_name,
                     "avatar_url": avatar_url,
                     "slug": slug,
+                    "role": role,
                 },
             )
             if await inserted_cursor.fetchone() is not None:
@@ -101,6 +103,16 @@ async def provision_user(claims: dict[str, Any]) -> dict[str, Any]:
             if await existing_cursor.fetchone() is not None:
                 break
 
+        await conn.execute(
+            """
+            UPDATE app_users
+               SET role = 'admin'
+             WHERE id = %(id)s
+               AND %(promote)s
+               AND role <> 'admin'
+            """,
+            {"id": user_id, "promote": role == "admin"},
+        )
         await conn.execute(
             "INSERT INTO user_stats (user_id) VALUES (%(id)s) ON CONFLICT DO NOTHING",
             {"id": user_id},

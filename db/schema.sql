@@ -434,24 +434,33 @@ CREATE TRIGGER content_flags_sync
 
 CREATE VIEW admin_flag_queue AS
 SELECT c.id            AS content_id,
-       l.name          AS language,
+       l.code          AS language,
        c.content_type,
        c.target_text,
-       ml.code         AS meta_language,
-       ct.translation,
-       c.flag_count,
-       ct.verified,
+       default_ct.translation,
+       f.status,
+       count(f.id)::INTEGER AS flag_count,
        min(f.created_at) AS oldest_flag_at,
-       array_agg(DISTINCT f.reason) AS reasons
+       array_agg(DISTINCT f.reason ORDER BY f.reason) AS reasons,
+       count(DISTINCT f.user_id)::INTEGER AS reporter_count,
+       jsonb_agg(jsonb_build_object(
+         'id', f.id,
+         'reason', f.reason,
+         'note', f.note,
+         'reporter_id', f.user_id,
+         'status', f.status,
+         'created_at', f.created_at,
+         'meta_language', ml.code
+       ) ORDER BY f.created_at, f.id) AS flags
   FROM content_items c
   JOIN languages l ON l.id = c.language_id
   JOIN content_flags f ON f.content_id = c.id
   LEFT JOIN languages ml ON ml.id = f.meta_language_id
-  LEFT JOIN content_translations ct
-    ON ct.content_id = c.id AND ct.meta_language_id = f.meta_language_id
- WHERE f.status IN ('open','in_review')
- GROUP BY c.id, l.name, ml.code, ct.translation, ct.verified
- ORDER BY c.flag_count DESC, oldest_flag_at ASC;
+  LEFT JOIN languages default_ml ON default_ml.code = 'eng' AND default_ml.is_meta
+  LEFT JOIN content_translations default_ct
+    ON default_ct.content_id = c.id AND default_ct.meta_language_id = default_ml.id
+ GROUP BY c.id, l.code, default_ct.translation, f.status
+ ORDER BY count(f.id) DESC, oldest_flag_at ASC;
 
 -- ---------------------------------------------------------------------
 -- 11. ROW LEVEL SECURITY (enable when wired to Supabase Auth)
