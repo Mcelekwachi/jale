@@ -15,7 +15,7 @@
 - Modify `db/schema.sql`: language roles, translations table, proverb trigger, scoped flags, views.
 - Modify `db/seed/seed.py`: meta-language loading, split content/translation validation and upserts.
 - Modify `db/seed/export_worklist.py`: translation-owned verification and explanation fields.
-- Create `content/meta_languages.yaml`: English and Dutch shared metadata.
+- Create `content/languages.yaml`: shared target and meta-language metadata.
 - Modify `content/ibo/{words,phrases,proverbs}.csv`: language-neutral target columns only.
 - Create `content/ibo/translations/{en,nl}.csv`: moved English data and empty Dutch template.
 - Modify `backend/app/config.py`: default meta-language setting.
@@ -61,7 +61,7 @@ Expected: failures because `content_translations`, `meta_language`, and `transla
 ### Task 2: Move content without changing its characters
 
 **Files:**
-- Create: `content/meta_languages.yaml`
+- Create: `content/languages.yaml`
 - Modify: `content/ibo/words.csv`
 - Modify: `content/ibo/phrases.csv`
 - Modify: `content/ibo/proverbs.csv`
@@ -128,7 +128,7 @@ Remove explanation requirements from `validate_rows`; retain source-key, content
 
 - [ ] **Step 2: Add translation parsing and pre-write validation**
 
-Load `content/meta_languages.yaml` and every `translations/*.csv`. Validate required headers, duplicate keys, keys belonging to the target content, and require each proverb's English row to have a non-empty translation and cultural note. Raise `SeedError` containing filename, row/source key, and the missing field.
+Load `content/languages.yaml` and every `translations/*.csv`. Validate required headers, duplicate keys, keys belonging to the target content, and require each proverb's English row to have a non-empty translation and cultural note. Raise `SeedError` containing filename, row/source key, and the missing field.
 
 - [ ] **Step 3: Upsert language roles**
 

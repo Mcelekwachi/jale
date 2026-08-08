@@ -16,7 +16,7 @@ A `BEFORE INSERT OR UPDATE` trigger on `content_translations` will look up the p
 
 ## Content and Seeding
 
-`content/meta_languages.yaml` will define English (`eng`) and Dutch (`nld`) as active meta-languages that are not learnable. The three Igbo source CSVs will retain only `source_key`, `content_type`, `category_slug`, `difficulty`, `target_text`, and `target_text_toned`.
+`content/languages.yaml` will define English (`eng`) and Dutch (`nld`) as active meta-languages that are not learnable. The three Igbo source CSVs will retain only `source_key`, `content_type`, `category_slug`, `difficulty`, `target_text`, and `target_text_toned`.
 
 Every existing explanation value will be moved character-for-character into `content/ibo/translations/en.csv`. `nl.csv` will contain the same 157 source keys with empty explanation fields. No Igbo text, tones, categories, difficulty values, or keys will change.
 

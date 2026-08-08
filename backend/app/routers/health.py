@@ -29,7 +29,7 @@ async def health_db(response: Response) -> dict:
             """
             SELECT (SELECT count(*) FROM content_items WHERE status='published') AS content,
                    (SELECT count(*) FROM tracks) AS tracks,
-                   (SELECT count(*) FROM languages WHERE is_learnable) AS languages
+                   (SELECT count(*) FROM languages WHERE is_learnable AND is_active) AS languages
             """
         )
     except Exception as exc:  # noqa: BLE001 — surfaced as an unhealthy response
