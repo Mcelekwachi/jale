@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
+from pathlib import Path
 
 import psycopg
 import pytest
 from db_test_utils import db_connection
 
 pytestmark = pytest.mark.asyncio
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 @contextmanager
@@ -124,6 +129,58 @@ async def test_meta_language_coverage_reports_empty_dutch_seed(client):
     assert languages["nld"]["is_active"] is True
     assert languages["nld"]["translated_count"] == 0
     assert languages["nld"]["total_count"] == 157
+
+
+async def test_language_catalogue_returns_roadmap_and_coverage_without_authentication(client):
+    response = await client.get("/v1/languages/catalogue")
+
+    assert response.status_code == 200
+    catalogue = response.json()
+    assert len(catalogue["learnable"]) == 5
+    assert len(catalogue["meta"]) == 6
+    learnable = {language["code"]: language for language in catalogue["learnable"]}
+    meta = {language["code"]: language for language in catalogue["meta"]}
+    assert learnable["ibo"]["available"] is True
+    assert learnable["ibo"]["content_count"] == 157
+    assert learnable["ibo"]["endonym"] == "Asụsụ Igbo"
+    assert learnable["yor"]["available"] is False
+    assert learnable["yor"]["content_count"] == 0
+    assert meta["nld"]["available"] is True
+    assert meta["nld"]["translated_count"] == 0
+    assert meta["nld"]["total_count"] == 157
+
+
+async def test_existing_language_endpoints_keep_their_shapes(client):
+    learnable = await client.get("/v1/languages")
+    meta = await client.get("/v1/languages/meta")
+
+    assert set(learnable.json()[0]) == {"code", "name", "endonym", "flag_emoji", "is_active"}
+    assert set(meta.json()[0]) == {
+        "code",
+        "name",
+        "endonym",
+        "flag_emoji",
+        "is_active",
+        "translated_count",
+        "total_count",
+    }
+
+
+async def test_reseeding_catalogue_is_idempotent_and_language_file_wins(
+    database_url,
+):
+    env = {**os.environ, "DATABASE_URL": database_url}
+    command = [sys.executable, str(REPO_ROOT / "db" / "seed" / "seed.py"), "--all"]
+
+    first = subprocess.run(command, cwd=REPO_ROOT, env=env, capture_output=True, text=True)
+    second = subprocess.run(command, cwd=REPO_ROOT, env=env, capture_output=True, text=True)
+
+    assert first.returncode == second.returncode == 0, first.stderr + second.stderr
+    with db_connection(database_url) as conn:
+        rows = conn.execute("SELECT code, is_active FROM languages ORDER BY code").fetchall()
+    assert len(rows) == 11
+    assert len({row[0] for row in rows}) == 11
+    assert dict(rows)["ibo"] is True
 
 
 async def test_categories_exclude_empty_ones(client):

@@ -1,0 +1,105 @@
+languages:
+  - code: ibo
+    name: Igbo
+    endonym: Asụsụ Igbo
+    flag_emoji: "🇳🇬"
+    is_learnable: true
+    is_meta: false
+    is_active: true
+    sort_order: 10
+
+  - code: eng
+    file_code: en
+    name: English
+    endonym: English
+    flag_emoji: "🇬🇧"
+    is_learnable: false
+    is_meta: true
+    is_active: true
+    sort_order: 20
+
+  - code: nld
+    file_code: nl
+    name: Dutch
+    endonym: Nederlands
+    flag_emoji: "🇳🇱"
+    is_learnable: false
+    is_meta: true
+    is_active: true
+    sort_order: 30
+
+  - code: yor
+    name: Yoruba
+    endonym: Èdè Yorùbá
+    flag_emoji: "🇳🇬"
+    is_learnable: true
+    is_meta: false
+    is_active: false
+    sort_order: 100
+
+  - code: hau
+    name: Hausa
+    endonym: Harshen Hausa
+    flag_emoji: "🇳🇬"
+    is_learnable: true
+    is_meta: false
+    is_active: false
+    sort_order: 110
+
+  - code: swa
+    name: Swahili
+    endonym: Kiswahili
+    flag_emoji: "🇹🇿"
+    is_learnable: true
+    is_meta: false
+    is_active: false
+    sort_order: 120
+
+  - code: afr
+    name: Afrikaans
+    endonym: Afrikaans
+    flag_emoji: "🇿🇦"
+    is_learnable: true
+    is_meta: false
+    is_active: false
+    sort_order: 130
+
+  - code: fra
+    file_code: fr
+    name: French
+    endonym: Français
+    flag_emoji: "🇫🇷"
+    is_learnable: false
+    is_meta: true
+    is_active: false
+    sort_order: 140
+
+  - code: por
+    file_code: pt
+    name: Portuguese
+    endonym: Português
+    flag_emoji: "🇵🇹"
+    is_learnable: false
+    is_meta: true
+    is_active: false
+    sort_order: 150
+
+  - code: spa
+    file_code: es
+    name: Spanish
+    endonym: Español
+    flag_emoji: "🇪🇸"
+    is_learnable: false
+    is_meta: true
+    is_active: false
+    sort_order: 160
+
+  - code: ita
+    file_code: it
+    name: Italian
+    endonym: Italiano
+    flag_emoji: "🇮🇹"
+    is_learnable: false
+    is_meta: true
+    is_active: false
+    sort_order: 170

@@ -98,6 +98,30 @@ class MetaLanguageCoverage(Language):
     total_count: int
 
 
+class CatalogueLanguage(BaseModel):
+    code: str
+    name: str
+    endonym: str | None = None
+    flag_emoji: str | None = None
+    available: bool
+    content_count: int
+
+
+class CatalogueMetaLanguage(BaseModel):
+    code: str
+    name: str
+    endonym: str | None = None
+    flag_emoji: str | None = None
+    available: bool
+    translated_count: int
+    total_count: int
+
+
+class LanguageCatalogue(BaseModel):
+    learnable: list[CatalogueLanguage]
+    meta: list[CatalogueMetaLanguage]
+
+
 class Category(BaseModel):
     slug: str
     name: str

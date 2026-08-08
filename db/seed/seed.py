@@ -121,9 +121,9 @@ def upsert_language(cur, lang):
         VALUES (%(code)s, %(name)s, %(endonym)s, %(flag_emoji)s,
                 %(is_active)s, %(is_learnable)s, %(is_meta)s, %(sort_order)s)
         ON CONFLICT (code) DO UPDATE SET
-            name       = EXCLUDED.name,
-            endonym    = EXCLUDED.endonym,
-            flag_emoji = EXCLUDED.flag_emoji,
+            name       = COALESCE(NULLIF(EXCLUDED.name, ''), languages.name),
+            endonym    = COALESCE(NULLIF(EXCLUDED.endonym, ''), languages.endonym),
+            flag_emoji = COALESCE(NULLIF(EXCLUDED.flag_emoji, ''), languages.flag_emoji),
             is_active  = EXCLUDED.is_active,
             is_learnable = EXCLUDED.is_learnable,
             is_meta      = EXCLUDED.is_meta,
@@ -424,8 +424,8 @@ def read_csv(path, required_headers, errors):
         return [r for r in reader if any((v or "").strip() for v in r.values())]
 
 
-def load_meta_languages(errors):
-    path = CONTENT_ROOT / "meta_languages.yaml"
+def load_language_registry(errors):
+    path = CONTENT_ROOT / "languages.yaml"
     document = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if not isinstance(document, dict):
         errors.append(f"{path}: YAML root must be a mapping")
@@ -440,19 +440,31 @@ def load_meta_languages(errors):
         if not isinstance(lang, dict):
             errors.append(f"{loc}: language entry must be a mapping")
             continue
-        for field in ("code", "name", "file_code"):
-            if not lang.get(field):
+        for field in (
+            "code",
+            "name",
+            "endonym",
+            "flag_emoji",
+            "is_active",
+            "is_learnable",
+            "is_meta",
+            "sort_order",
+        ):
+            value = lang.get(field)
+            if field not in lang or value is None or (isinstance(value, str) and not value.strip()):
                 errors.append(f"{loc}: missing {field}")
         code, file_code = lang.get("code"), lang.get("file_code")
         if code in codes:
             errors.append(f"{loc}: duplicate language code {code!r}")
         codes.add(code)
+        if lang.get("is_meta") and not file_code:
+            errors.append(f"{loc}: meta language is missing file_code")
         if file_code in file_codes:
             errors.append(f"{loc}: duplicate file_code {file_code!r}")
         elif file_code:
             file_codes[file_code] = code
-        if not lang.get("is_meta", False):
-            errors.append(f"{loc}: meta language must set is_meta: true")
+        if not lang.get("is_meta", False) and not lang.get("is_learnable", False):
+            errors.append(f"{loc}: language must be learnable, meta, or both")
     return languages, file_codes
 
 
@@ -494,7 +506,7 @@ def prepare_language(code, file_codes):
         if not meta_code:
             errors.append(
                 f"{path}: filename code {path.stem!r} is not declared as file_code "
-                "in content/meta_languages.yaml"
+                "in content/languages.yaml"
             )
         rows = read_csv(path, TRANSLATION_HEADERS, errors)
         seen = set()
@@ -575,12 +587,20 @@ def prepare_language(code, file_codes):
     }, []
 
 
-def write_language(conn, plan, meta_languages):
+def write_registry(conn, registry):
+    with conn.cursor(row_factory=dict_row) as cur:
+        for language in registry:
+            upsert_language(cur, language)
+
+
+def write_language(conn, plan, registry_by_code):
     spec, lang = plan["spec"], plan["lang"]
     categories, all_rows = plan["categories"], plan["all_rows"]
     with conn.cursor(row_factory=dict_row) as cur:
-        language_ids = {m["code"]: upsert_language(cur, m) for m in meta_languages}
-        language_id = upsert_language(cur, lang)
+        merged_language = {**registry_by_code[lang["code"]], **lang}
+        language_id = upsert_language(cur, merged_language)
+        cur.execute("SELECT code, id FROM languages WHERE is_meta")
+        language_ids = {row["code"]: row["id"] for row in cur.fetchall()}
         dialects = upsert_dialects(cur, language_id, spec.get("dialects", []))
         default_dialect = next(
             (d["code"] for d in spec.get("dialects", []) if d.get("is_default")), None
@@ -633,16 +653,21 @@ def main():
 
     errors = []
     try:
-        meta_languages, file_codes = load_meta_languages(errors)
+        registry, file_codes = load_language_registry(errors)
     except (OSError, TypeError, yaml.YAMLError) as exc:
-        meta_languages, file_codes = [], {}
-        errors.append(f"{CONTENT_ROOT / 'meta_languages.yaml'}: {exc}")
+        registry, file_codes = [], {}
+        errors.append(f"{CONTENT_ROOT / 'languages.yaml'}: {exc}")
+    registry_by_code = {language["code"]: language for language in registry}
     plans = []
     for code in codes:
         try:
             plan, language_errors = prepare_language(code, file_codes)
             errors.extend(language_errors)
             if plan:
+                if plan["code"] not in registry_by_code:
+                    errors.append(
+                        f"content/{code}: language is missing from content/languages.yaml"
+                    )
                 plans.append(plan)
         except (OSError, KeyError, TypeError, yaml.YAMLError, SeedError) as exc:
             errors.append(f"{CONTENT_ROOT / code}: {exc}")
@@ -672,8 +697,9 @@ def main():
 
     conn = psycopg.connect(args.database_url)
     try:
+        write_registry(conn, registry)
         for plan in plans:
-            write_language(conn, plan, meta_languages)
+            write_language(conn, plan, registry_by_code)
         conn.commit()
     except SeedError as exc:
         print(f"\nseed failed: {exc}", file=sys.stderr)

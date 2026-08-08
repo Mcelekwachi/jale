@@ -560,6 +560,41 @@ async def test_patch_preferences_rejects_non_learnable_active_language(
         assert response.status_code == 422
 
 
+@pytest.mark.parametrize(
+    ("payload", "language_name"),
+    [
+        ({"active_language": "yor"}, "Yoruba"),
+        ({"meta_language": "fra"}, "French"),
+    ],
+)
+async def test_patch_preferences_rejects_languages_that_are_not_yet_available(
+    client, database_url, user_id, auth_headers, payload, language_name
+):
+    with remove_test_users(database_url, user_id):
+        response = await client.patch(
+            "/v1/me/preferences", headers=auth_headers(subject=user_id), json=payload
+        )
+
+    assert response.status_code == 422
+    assert language_name in response.json()["detail"]
+    assert "not yet available" in response.json()["detail"]
+
+
+async def test_patch_preferences_accepts_available_target_and_meta_languages(
+    client, database_url, user_id, auth_headers
+):
+    with remove_test_users(database_url, user_id):
+        response = await client.patch(
+            "/v1/me/preferences",
+            headers=auth_headers(subject=user_id),
+            json={"active_language": "ibo", "meta_language": "nld"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["preferences"]["active_language"] == "ibo"
+    assert response.json()["preferences"]["meta_language"] == "nld"
+
+
 async def test_complete_onboarding_is_idempotent_and_keeps_completed_at(
     client, database_url, user_id, auth_headers
 ):
