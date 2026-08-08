@@ -42,6 +42,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
         });
         if (error) throw error;
       },
+      signInWithPassword: async (email, password) => {
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) throw error;
+      },
       signInWithGoogle: async () => {
         const { error } = await supabase.auth.signInWithOAuth({
           provider: "google",
