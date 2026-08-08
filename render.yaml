@@ -27,6 +27,8 @@ services:
         sync: false
       - key: SUPABASE_JWT_AUDIENCE
         value: authenticated
+      - key: ADMIN_EMAILS
+        sync: false
       - key: CORS_ORIGINS
         sync: false            # set to your Vercel URLs in the dashboard
       - key: WEB_CONCURRENCY

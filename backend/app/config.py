@@ -25,6 +25,14 @@ class Settings:
         self.pool_min_size: int = int(os.getenv("DB_POOL_MIN", "1"))
         self.pool_max_size: int = int(os.getenv("DB_POOL_MAX", "5"))
         self.max_page_size: int = int(os.getenv("MAX_PAGE_SIZE", "200"))
+        self.admin_emails: frozenset[str] = frozenset(
+            email.strip().casefold()
+            for email in os.getenv("ADMIN_EMAILS", "").split(",")
+            if email.strip()
+        )
+
+    def is_admin_email(self, email: str | None) -> bool:
+        return isinstance(email, str) and email.strip().casefold() in self.admin_emails
 
     @property
     def is_production(self) -> bool:
