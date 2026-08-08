@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 from functools import lru_cache
+from urllib.parse import urlparse
 
 
 class Settings:
@@ -13,8 +14,29 @@ class Settings:
         self.database_url: str = os.getenv("DATABASE_URL", "")
         self.default_language: str = os.getenv("DEFAULT_LANGUAGE", "ibo")
         self.default_meta_language: str = os.getenv("DEFAULT_META_LANGUAGE", "eng")
-        self.supabase_jwt_secret: str = os.getenv("SUPABASE_JWT_SECRET", "")
-        self.supabase_project_url: str = os.getenv("SUPABASE_PROJECT_URL", "")
+        self.supabase_jwt_secret: str | None = os.getenv("SUPABASE_JWT_SECRET") or None
+        project_url = os.getenv("SUPABASE_PROJECT_URL", "").strip().rstrip("/")
+        if not project_url:
+            raise ValueError(
+                "SUPABASE_PROJECT_URL is required — JWKS verification cannot run without it"
+            )
+        parsed_project_url = urlparse(project_url)
+        try:
+            _ = parsed_project_url.port
+        except ValueError:
+            raise ValueError("SUPABASE_PROJECT_URL must be a valid https URL") from None
+        if (
+            parsed_project_url.scheme != "https"
+            or not parsed_project_url.hostname
+            or parsed_project_url.username
+            or parsed_project_url.password
+            or parsed_project_url.path not in {"", "/"}
+            or parsed_project_url.params
+            or parsed_project_url.query
+            or parsed_project_url.fragment
+        ):
+            raise ValueError("SUPABASE_PROJECT_URL must be a valid https URL")
+        self.supabase_project_url: str = project_url
         self.supabase_jwt_audience: str = os.getenv("SUPABASE_JWT_AUDIENCE", "authenticated")
 
         # Vercel preview deployments get their own URL per branch, so the
