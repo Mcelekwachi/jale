@@ -441,7 +441,7 @@ SELECT c.id            AS content_id,
        f.status,
        count(f.id)::INTEGER AS flag_count,
        min(f.created_at) AS oldest_flag_at,
-       array_agg(DISTINCT f.reason ORDER BY f.reason) AS reasons,
+       array_agg(DISTINCT f.reason::text ORDER BY f.reason::text) AS reasons,
        count(DISTINCT f.user_id)::INTEGER AS reporter_count,
        jsonb_agg(jsonb_build_object(
          'id', f.id,
