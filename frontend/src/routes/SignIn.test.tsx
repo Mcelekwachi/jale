@@ -39,26 +39,17 @@ describe("SignIn", () => {
     expect(await screen.findByText(/check your email/i)).toBeInTheDocument();
   });
 
-  it("shows a friendly message when Google auth is not enabled", async () => {
-    mockedUseAuth.mockReturnValue(
-      authValue({
-        signInWithGoogle: vi
-          .fn()
-          .mockRejectedValue(
-            new Error("Unsupported provider: provider is not enabled"),
-          ),
-      }),
-    );
+  it("hides Google auth and its divider unless explicitly enabled", () => {
+    vi.stubEnv("VITE_GOOGLE_ENABLED", "false");
+    mockedUseAuth.mockReturnValue(authValue());
     render(
       <MemoryRouter>
         <SignIn />
       </MemoryRouter>,
     );
-    await userEvent.click(
-      screen.getByRole("button", { name: /continue with google/i }),
-    );
     expect(
-      await screen.findByText("Google sign-in is not available yet"),
-    ).toBeInTheDocument();
+      screen.queryByRole("button", { name: /continue with google/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/^or$/i)).not.toBeInTheDocument();
   });
 });
