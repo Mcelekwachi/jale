@@ -5,15 +5,6 @@ import { useAuth } from "../auth/useAuth";
 import { Button } from "../components/Button";
 import { ErrorMessage } from "../components/ErrorMessage";
 
-function isGoogleUnavailable(error: unknown): boolean {
-  return (
-    error instanceof Error &&
-    /provider.+(not enabled|unsupported)|unsupported provider/i.test(
-      error.message,
-    )
-  );
-}
-
 export function SignIn() {
   const { user, signInWithEmail, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
@@ -46,6 +37,8 @@ export function SignIn() {
     }
   }
 
+  const googleEnabled = import.meta.env.VITE_GOOGLE_ENABLED === "true";
+
   async function continueWithGoogle() {
     setBusy(true);
     setError(null);
@@ -53,11 +46,7 @@ export function SignIn() {
       await signInWithGoogle();
     } catch (caught) {
       setError(
-        isGoogleUnavailable(caught)
-          ? "Google sign-in is not available yet"
-          : caught instanceof Error
-            ? caught.message
-            : "Google sign-in failed",
+        caught instanceof Error ? caught.message : "Google sign-in failed",
       );
       setBusy(false);
     }
@@ -111,19 +100,23 @@ export function SignIn() {
               </Button>
             </form>
           )}
-          <div className="flex items-center gap-3 text-xs uppercase tracking-widest text-muted">
-            <span className="h-px flex-1 bg-sand" />
-            or
-            <span className="h-px flex-1 bg-sand" />
-          </div>
-          <Button
-            type="button"
-            variant="secondary"
-            busy={busy}
-            onClick={continueWithGoogle}
-          >
-            Continue with Google
-          </Button>
+          {googleEnabled && (
+            <>
+              <div className="flex items-center gap-3 text-xs uppercase tracking-widest text-muted">
+                <span className="h-px flex-1 bg-sand" />
+                or
+                <span className="h-px flex-1 bg-sand" />
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                busy={busy}
+                onClick={continueWithGoogle}
+              >
+                Continue with Google
+              </Button>
+            </>
+          )}
         </div>
       </section>
     </main>

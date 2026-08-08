@@ -102,6 +102,24 @@ export interface ResolvedTrack {
   is_fallback: boolean;
 }
 
+export interface UserStats {
+  current_streak: number;
+  longest_streak: number;
+  total_items_seen: number;
+  total_mastered: number;
+  total_xp: number;
+  today_items_reviewed: number;
+  today_goal_met: boolean;
+  activity_dates: string[];
+}
+
+export interface DueStudyItems {
+  items: StudyItem[];
+}
+
+export type StudyDirection = "target_to_meta" | "meta_to_target";
+export type AudioState = "missing" | "placeholder" | "verified";
+
 export interface UserPreferences {
   active_language: string;
   meta_language?: string | null;

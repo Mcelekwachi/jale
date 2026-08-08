@@ -8,6 +8,7 @@ import { Home } from "./routes/Home";
 import { Onboarding } from "./routes/Onboarding";
 import { Settings } from "./routes/Settings";
 import { SignIn } from "./routes/SignIn";
+import { Study } from "./routes/Study";
 
 export function App() {
   return (
@@ -22,6 +23,10 @@ export function App() {
             <Route element={<OnboardingGuard />}>
               <Route path="/" element={<Home />} />
               <Route path="/settings" element={<Settings />} />
+              <Route
+                path="/study/:trackSlug/:unitPosition"
+                element={<Study />}
+              />
             </Route>
           </Route>
         </Routes>
