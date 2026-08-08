@@ -21,7 +21,7 @@ async def list_flags(
                       flag_count, oldest_flag_at, reasons, reporter_count, flags
                  FROM admin_flag_queue
                 WHERE status=%(status)s::flag_status
-                  AND (%(reason)s::flag_reason IS NULL OR %(reason)s=ANY(reasons))
+                  AND (%(reason)s::text IS NULL OR %(reason)s::text = ANY(reasons))
                   AND (%(language)s::text IS NULL OR language=%(language)s)
                 ORDER BY flag_count DESC, oldest_flag_at, content_id
                 LIMIT %(limit)s OFFSET %(offset)s""",

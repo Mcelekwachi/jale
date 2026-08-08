@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from app.auth import current_user
+from app.auth import current_user, require_admin
 from app.config import Settings
 from app.main import create_app
 from fastapi import FastAPI
@@ -47,6 +47,16 @@ async def test_all_admin_routes_return_401_without_authentication():
         for method, path, body in ADMIN_REQUESTS:
             response = await client.request(method, path, json=body)
             assert response.status_code == 401, (method, path, response.text)
+
+
+@pytest.mark.asyncio
+async def test_flag_queue_rejects_invalid_reason_with_422():
+    app = create_app()
+    app.dependency_overrides[require_admin] = lambda: {"id": uuid.uuid4(), "role": "admin"}
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/v1/admin/flags?reason=not_a_real_reason")
+
+    assert response.status_code == 422
 
 
 def test_admin_email_matching_is_trimmed_and_case_insensitive(monkeypatch):
