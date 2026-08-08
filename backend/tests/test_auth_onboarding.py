@@ -39,16 +39,14 @@ def auth_row_counts(database_url: str, user_id: uuid.UUID) -> tuple[int, int, in
         ).fetchone()
 
 
-async def test_settings_allow_public_startup_without_supabase_auth_config(monkeypatch):
+async def test_settings_require_supabase_project_url(monkeypatch):
     from app.config import Settings
 
     monkeypatch.delenv("SUPABASE_JWT_SECRET", raising=False)
     monkeypatch.delenv("SUPABASE_PROJECT_URL", raising=False)
 
-    settings = Settings()
-
-    assert settings.supabase_jwt_secret == ""
-    assert settings.supabase_project_url == ""
+    with pytest.raises(ValueError, match="SUPABASE_PROJECT_URL"):
+        Settings()
 
 
 @pytest.mark.parametrize(

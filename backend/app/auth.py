@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from functools import lru_cache
 from typing import Annotated, Any
 
 import jwt
@@ -18,22 +19,43 @@ _AUTH_ERROR = HTTPException(
 )
 
 
+@lru_cache
+def _jwks_client(jwks_url: str) -> jwt.PyJWKClient:
+    return jwt.PyJWKClient(jwks_url, cache_keys=True, cache_jwk_set=True)
+
+
 def _decode(credentials: HTTPAuthorizationCredentials | None) -> dict[str, Any]:
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise _AUTH_ERROR
     settings = get_settings()
-    if not settings.supabase_jwt_secret:
-        raise _AUTH_ERROR
     try:
+        token = credentials.credentials
+        header = jwt.get_unverified_header(token)
+        algorithm = header.get("alg")
+        if algorithm == "HS256":
+            if not settings.supabase_jwt_secret:
+                raise jwt.InvalidKeyError("HS256 secret is not configured")
+            verification_key: Any = settings.supabase_jwt_secret
+        elif algorithm in {"ES256", "RS256"}:
+            if not isinstance(header.get("kid"), str):
+                raise jwt.InvalidTokenError("asymmetric token has no key id")
+            jwks_url = f"{settings.supabase_project_url}/auth/v1/.well-known/jwks.json"
+            signing_key = _jwks_client(jwks_url).get_signing_key_from_jwt(token)
+            if signing_key.algorithm_name != algorithm:
+                raise jwt.InvalidAlgorithmError("token and signing key algorithms differ")
+            verification_key = signing_key.key
+        else:
+            raise jwt.InvalidAlgorithmError("unsupported token algorithm")
+
         claims = jwt.decode(
-            credentials.credentials,
-            settings.supabase_jwt_secret,
-            algorithms=["HS256"],
+            token,
+            verification_key,
+            algorithms=[algorithm],
             audience=settings.supabase_jwt_audience,
             options={"require": ["exp", "sub", "aud"]},
         )
         uuid.UUID(str(claims["sub"]))
-    except (jwt.PyJWTError, KeyError, TypeError, ValueError):
+    except Exception:  # noqa: BLE001 — all authentication failures must be indistinguishable
         raise _AUTH_ERROR from None
     return claims
 

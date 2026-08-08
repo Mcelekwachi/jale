@@ -8,9 +8,10 @@
 
 from __future__ import annotations
 
+import os
+
 from fastapi import APIRouter, Response, status
 
-from app.config import get_settings
 from app.db import fetch_one
 
 router = APIRouter(tags=["health"])
@@ -18,7 +19,7 @@ router = APIRouter(tags=["health"])
 
 @router.get("/health")
 async def health() -> dict:
-    return {"status": "ok", "env": get_settings().env}
+    return {"status": "ok", "env": os.getenv("APP_ENV", "development")}
 
 
 @router.get("/health/db")

@@ -113,5 +113,8 @@ jobs:
           cache-to: type=gha,mode=max
       - name: Smoke test the built image
         run: |
-          docker run --rm --entrypoint python jale-api:ci \
+          docker run --rm \
+            -e SUPABASE_PROJECT_URL=https://example.supabase.co \
+            -e DATABASE_URL=postgresql://user:pass@localhost:5432/db \
+            --entrypoint python jale-api:ci \
             -c "from app.main import create_app; create_app(); print('app imports and builds')"
