@@ -5,6 +5,7 @@ import uuid
 import pytest
 from app.auth import current_user
 from app.main import create_app
+from app.schemas import FlagReason
 from db_test_utils import db_connection, isolated_test_users
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
@@ -140,6 +141,11 @@ async def test_flag_queue_resolution_and_bulk_resolution(client, database_url, a
         matches = [row for row in queue.json() if row["content_id"] == content_id]
         assert len(matches) == 1
         assert matches[0]["flag_count"] == 2
+        assert isinstance(matches[0]["reasons"], list)
+        assert all(isinstance(reason, str) for reason in matches[0]["reasons"])
+        assert all(
+            reason in {member.value for member in FlagReason} for reason in matches[0]["reasons"]
+        )
         assert set(matches[0]["reasons"]) == {"bad_audio", "wrong_translation"}
         assert matches[0]["reporter_count"] == 2
         assert {flag["note"] for flag in matches[0]["flags"]} == {"one", "two"}
@@ -179,6 +185,38 @@ async def test_flag_queue_resolution_and_bulk_resolution(client, database_url, a
         with isolated_test_users(
             *(value for value in (admin_id, reporter_one, reporter_two) if value)
         ):
+            pass
+
+
+async def test_flag_queue_single_reason_is_a_one_element_string_list(
+    client, database_url, auth_headers
+):
+    admin_id = reporter_id = None
+    content_id = disposable_content(database_url)
+    try:
+        admin_id, admin_headers = await provision_admin(client, database_url, auth_headers)
+        reporter_id = uuid.uuid4()
+        assert (
+            await client.get("/v1/me", headers=auth_headers(subject=reporter_id))
+        ).status_code == 200
+        with db_connection(database_url) as conn:
+            conn.execute(
+                "INSERT INTO content_flags (content_id,user_id,reason) VALUES (%s,%s,'other')",
+                (content_id, reporter_id),
+            )
+
+        queue = await client.get("/v1/admin/flags", headers=admin_headers)
+
+        assert queue.status_code == 200
+        match = next(row for row in queue.json() if row["content_id"] == content_id)
+        assert match["reasons"] == ["other"]
+        assert isinstance(match["reasons"], list)
+        assert all(isinstance(reason, str) for reason in match["reasons"])
+        assert all(reason in {member.value for member in FlagReason} for reason in match["reasons"])
+    finally:
+        with db_connection(database_url) as conn:
+            conn.execute("DELETE FROM content_items WHERE id=%s", (content_id,))
+        with isolated_test_users(*(value for value in (admin_id, reporter_id) if value)):
             pass
 
 
