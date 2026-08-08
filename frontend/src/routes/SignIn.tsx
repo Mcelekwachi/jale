@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth/useAuth";
@@ -6,18 +6,34 @@ import { Button } from "../components/Button";
 import { ErrorMessage } from "../components/ErrorMessage";
 
 export function SignIn() {
-  const { user, signInWithEmail, signInWithGoogle } = useAuth();
+  const { user, signInWithEmail, signInWithPassword, signInWithGoogle } =
+    useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as { from?: string; message?: string } | null;
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [mode, setMode] = useState<"magic" | "password">("magic");
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(state?.message ?? null);
+  const emailInput = useRef<HTMLInputElement>(null);
+  const passwordInput = useRef<HTMLInputElement>(null);
+  const focusTarget = useRef<"email" | "password" | null>(null);
 
   useEffect(() => {
     if (user) navigate(state?.from ?? "/", { replace: true });
   }, [navigate, state?.from, user]);
+
+  useEffect(() => {
+    if (mode !== "password" || !focusTarget.current) return;
+    const input =
+      focusTarget.current === "email"
+        ? emailInput.current
+        : passwordInput.current;
+    input?.focus({ preventScroll: true });
+    focusTarget.current = null;
+  }, [mode]);
 
   async function sendMagicLink(event: FormEvent) {
     event.preventDefault();
@@ -32,6 +48,42 @@ export function SignIn() {
           ? caught.message
           : "We could not send the magic link",
       );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function showPasswordForm() {
+    setError(null);
+    setSent(false);
+    focusTarget.current = email ? "password" : "email";
+    setMode("password");
+  }
+
+  function showMagicLinkForm() {
+    setError(null);
+    setMode("magic");
+  }
+
+  async function submitPassword(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await signInWithPassword(email, password);
+    } catch (caught) {
+      if (
+        caught instanceof Error &&
+        caught.message.toLowerCase().includes("invalid login credentials")
+      ) {
+        setError("That email or password is not correct.");
+      } else {
+        setError(
+          caught instanceof Error && caught.message
+            ? caught.message
+            : "We could not sign you in. Please try again.",
+        );
+      }
     } finally {
       setBusy(false);
     }
@@ -71,7 +123,47 @@ export function SignIn() {
             </h1>
           </div>
           {error && <ErrorMessage message={error} />}
-          {sent ? (
+          {mode === "password" ? (
+            <form className="space-y-4" onSubmit={submitPassword}>
+              <label className="block text-sm font-semibold" htmlFor="email">
+                Email address
+              </label>
+              <input
+                ref={emailInput}
+                id="email"
+                type="email"
+                required
+                autoComplete="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                className="min-h-11 w-full rounded-2xl border border-sand bg-white px-4 py-3 outline-none focus:border-ochre focus:ring-2 focus:ring-ochre-soft"
+                placeholder="you@example.com"
+              />
+              <label className="block text-sm font-semibold" htmlFor="password">
+                Password
+              </label>
+              <input
+                ref={passwordInput}
+                id="password"
+                type="password"
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className="min-h-11 w-full rounded-2xl border border-sand bg-white px-4 py-3 outline-none focus:border-ochre focus:ring-2 focus:ring-ochre-soft"
+              />
+              <Button type="submit" busy={busy}>
+                Sign in
+              </Button>
+              <button
+                type="button"
+                className="flex min-h-11 w-full items-center justify-center text-sm font-semibold text-indigo-deep underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ochre"
+                onClick={showMagicLinkForm}
+              >
+                Use a magic link instead
+              </button>
+            </form>
+          ) : sent ? (
             <div className="rounded-2xl bg-ochre-soft p-5">
               <h2 className="font-display text-xl font-semibold text-indigo-deep">
                 Check your email
@@ -86,6 +178,7 @@ export function SignIn() {
                 Email address
               </label>
               <input
+                ref={emailInput}
                 id="email"
                 type="email"
                 required
@@ -99,6 +192,15 @@ export function SignIn() {
                 Send magic link
               </Button>
             </form>
+          )}
+          {mode === "magic" && (
+            <button
+              type="button"
+              className="flex min-h-11 w-full items-center justify-center text-sm font-semibold text-indigo-deep underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ochre"
+              onClick={showPasswordForm}
+            >
+              Sign in with a password instead
+            </button>
           )}
           {googleEnabled && (
             <>

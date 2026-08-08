@@ -17,6 +17,7 @@ function authValue(
     session: null,
     user: null,
     signInWithEmail: vi.fn().mockResolvedValue(undefined),
+    signInWithPassword: vi.fn().mockResolvedValue(undefined),
     signInWithGoogle: vi.fn().mockResolvedValue(undefined),
     signOut: vi.fn().mockResolvedValue(undefined),
     ...overrides,

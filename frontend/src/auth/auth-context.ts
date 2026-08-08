@@ -9,6 +9,7 @@ export interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
   signInWithEmail: (email: string) => Promise<void>;
+  signInWithPassword: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
 }
