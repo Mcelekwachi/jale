@@ -281,7 +281,11 @@ async def test_requested_translation_falls_back_each_optional_field_independentl
     proverbs = select_content_rows(
         database_url,
         "c.content_type = 'proverb' AND ct.literal_translation IS NOT NULL "
-        "AND ct.cultural_note IS NOT NULL",
+        "AND ct.cultural_note IS NOT NULL AND NOT EXISTS ("
+        "SELECT 1 FROM content_translations nld_ct "
+        "JOIN languages nld ON nld.id = nld_ct.meta_language_id "
+        "WHERE nld_ct.content_id = c.id AND nld.code = 'nld'"
+        ")",
         expected_count=2,
     )
     dutch_literal = "Nederlandse letterlijke vertaling"
@@ -351,7 +355,14 @@ async def test_seeded_translation_counts(database_url):
 
 
 async def test_meta_language_coverage_counts_only_published_content(client, database_url):
-    published = select_content_row(database_url, "c.content_type = 'proverb'")
+    published = select_content_row(
+        database_url,
+        "c.content_type = 'proverb' AND NOT EXISTS ("
+        "SELECT 1 FROM content_translations nld_ct "
+        "JOIN languages nld ON nld.id = nld_ct.meta_language_id "
+        "WHERE nld_ct.content_id = c.id AND nld.code = 'nld'"
+        ")",
+    )
     draft_key = f"test:draft:{uuid.uuid4()}"
     with db_connection(database_url) as conn:
         dutch_id = conn.execute("SELECT id FROM languages WHERE code = 'nld'").fetchone()[0]

@@ -228,9 +228,15 @@ async def test_due_meta_language_fallback_direction_and_exact_item_shape(
             """
             SELECT c.id, c.target_text, ct.translation
               FROM content_items c
-              JOIN content_translations ct ON ct.content_id = c.id
-              JOIN languages ml ON ml.id = ct.meta_language_id AND ml.code = 'eng'
+             JOIN content_translations ct ON ct.content_id = c.id
+             JOIN languages ml ON ml.id = ct.meta_language_id AND ml.code = 'eng'
              WHERE c.status = 'published' AND c.content_type = 'proverb'
+               AND NOT EXISTS (
+                   SELECT 1
+                     FROM content_translations nld_ct
+                     JOIN languages nld ON nld.id = nld_ct.meta_language_id
+                    WHERE nld_ct.content_id = c.id AND nld.code = 'nld'
+               )
              ORDER BY c.sort_order, c.id
              LIMIT 1
             """
