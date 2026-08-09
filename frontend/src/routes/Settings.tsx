@@ -122,6 +122,7 @@ export function Settings() {
             <h1 className="font-display text-4xl font-semibold text-indigo-deep">
               Settings
             </h1>
+            <p className="mt-1 text-sm text-muted">Learning preferences</p>
           </div>
           <Button
             className="w-auto"

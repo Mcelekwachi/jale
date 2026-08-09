@@ -203,10 +203,11 @@ export function Study() {
           <Link to="/" className="inline-flex min-h-11 items-center">
             ← Home
           </Link>
-          <span>
-            {index + 1} of {session.items.length}
-          </span>
+          <span>Item {index + 1} of {session.items.length}</span>
         </header>
+        <p className="text-xs font-bold uppercase tracking-[.18em] text-terracotta">
+          {session.track} · {session.unit_title}
+        </p>
         {queueError && (
           <div className="my-3 rounded-xl bg-terracotta-soft p-3 text-sm">
             Answers are still safe in this session.{" "}

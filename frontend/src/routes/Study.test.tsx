@@ -58,6 +58,8 @@ describe("Study", () => {
   it("renders flashcards with reveal and rating controls", async () => {
     setup("flashcard");
     expect(await screen.findByText("Ndewo")).toBeInTheDocument();
+    expect(screen.getByText(/foundations.*greetings/i)).toBeInTheDocument();
+    expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /reveal/i }));
     expect(screen.getByText("Hello")).toBeInTheDocument();
     expect(
