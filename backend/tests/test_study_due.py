@@ -18,37 +18,6 @@ def due_user(database_url: str, user_id: uuid.UUID) -> Iterator[None]:
 
 
 @contextmanager
-def dutch_translation(database_url: str, content_id: int, text: str) -> Iterator[None]:
-    with db_connection(database_url) as conn:
-        dutch_id = conn.execute("SELECT id FROM languages WHERE code='nld'").fetchone()[0]
-        existing = conn.execute(
-            """
-            SELECT translation, literal_translation, cultural_note, verified,
-                   verified_by, verified_at, contributor_id, created_at, updated_at
-              FROM content_translations
-             WHERE content_id=%s AND meta_language_id=%s
-            """,
-            (content_id, dutch_id),
-        ).fetchone()
-        assert existing is None, "test content must not already have a Dutch translation"
-        conn.execute(
-            """
-            INSERT INTO content_translations (content_id, meta_language_id, translation)
-            VALUES (%s, %s, %s)
-            """,
-            (content_id, dutch_id, text),
-        )
-    try:
-        yield
-    finally:
-        with db_connection(database_url) as conn:
-            conn.execute(
-                "DELETE FROM content_translations WHERE content_id=%s AND meta_language_id=%s",
-                (content_id, dutch_id),
-            )
-
-
-@contextmanager
 def fixed_utc_now(client, instant: datetime) -> Iterator[None]:
     from app.services.study_progress import get_utc_now
 
@@ -243,9 +212,37 @@ async def test_due_uses_token_users_stored_active_target_language(
 async def test_due_meta_language_fallback_direction_and_exact_item_shape(
     client, database_url, user_id, auth_headers
 ):
-    translated, fallback = published_rows(database_url, 2)
+    with db_connection(database_url) as conn:
+        translated = conn.execute(
+            """
+            SELECT c.id, c.target_text, ct.translation
+              FROM content_items c
+              JOIN content_translations ct ON ct.content_id = c.id
+              JOIN languages ml ON ml.id = ct.meta_language_id AND ml.code = 'nld'
+             WHERE c.status = 'published' AND c.content_type = 'word'
+             ORDER BY c.sort_order, c.id
+             LIMIT 1
+            """
+        ).fetchone()
+        fallback = conn.execute(
+            """
+            SELECT c.id, c.target_text, ct.translation
+              FROM content_items c
+             JOIN content_translations ct ON ct.content_id = c.id
+             JOIN languages ml ON ml.id = ct.meta_language_id AND ml.code = 'eng'
+             WHERE c.status = 'published' AND c.content_type = 'proverb'
+               AND NOT EXISTS (
+                   SELECT 1
+                     FROM content_translations nld_ct
+                     JOIN languages nld ON nld.id = nld_ct.meta_language_id
+                    WHERE nld_ct.content_id = c.id AND nld.code = 'nld'
+               )
+             ORDER BY c.sort_order, c.id
+             LIMIT 1
+            """
+        ).fetchone()
+    assert translated and fallback
     headers = auth_headers(subject=user_id)
-    dutch_text = f"Nederlandse vertaling {translated[0]}"
     expected_fields = {
         "id",
         "content_type",
@@ -264,10 +261,7 @@ async def test_due_meta_language_fallback_direction_and_exact_item_shape(
         "verified",
         "flag_count",
     }
-    with (
-        due_user(database_url, user_id),
-        dutch_translation(database_url, translated[0], dutch_text),
-    ):
+    with due_user(database_url, user_id):
         await provision(client, headers)
         seed_progress(
             database_url,
@@ -291,7 +285,7 @@ async def test_due_meta_language_fallback_direction_and_exact_item_shape(
         assert set(dutch_items[translated[0]]) == expected_fields
         assert dutch_items[translated[0]]["meta_language_used"] == "nld"
         assert dutch_items[translated[0]]["prompt"] == translated[1]
-        assert dutch_items[translated[0]]["answer"] == dutch_text
+        assert dutch_items[translated[0]]["answer"] == translated[2]
         assert dutch_items[fallback[0]]["meta_language_used"] == "eng"
         assert dutch_items[fallback[0]]["prompt"] == fallback[1]
         assert dutch_items[fallback[0]]["answer"] == fallback[2]

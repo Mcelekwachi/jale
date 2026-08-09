@@ -118,7 +118,7 @@ async def test_active_languages(client):
     assert codes == ["ibo"]
 
 
-async def test_meta_language_coverage_reports_empty_dutch_seed(client):
+async def test_meta_language_coverage_reports_seeded_dutch_words_and_phrases(client):
     r = await client.get("/v1/languages/meta")
     assert r.status_code == 200
     languages = {language["code"]: language for language in r.json()}
@@ -127,7 +127,7 @@ async def test_meta_language_coverage_reports_empty_dutch_seed(client):
     assert languages["eng"]["translated_count"] == 157
     assert languages["eng"]["total_count"] == 157
     assert languages["nld"]["is_active"] is True
-    assert languages["nld"]["translated_count"] == 0
+    assert languages["nld"]["translated_count"] == 107
     assert languages["nld"]["total_count"] == 157
 
 
@@ -146,7 +146,7 @@ async def test_language_catalogue_returns_roadmap_and_coverage_without_authentic
     assert learnable["yor"]["available"] is False
     assert learnable["yor"]["content_count"] == 0
     assert meta["nld"]["available"] is True
-    assert meta["nld"]["translated_count"] == 0
+    assert meta["nld"]["translated_count"] == 107
     assert meta["nld"]["total_count"] == 157
 
 
@@ -248,36 +248,31 @@ async def test_invalid_meta_language_is_rejected_by_all_endpoint_families(client
         assert r.status_code == 400, (path, r.text)
 
 
-async def test_empty_dutch_seed_falls_back_to_english_per_row(client):
+async def test_dutch_seed_falls_back_to_english_per_row(client):
     r = await client.get(
-        "/v1/content", params={"language": "ibo", "meta_language": "nld", "limit": 20}
+        "/v1/content", params={"language": "ibo", "meta_language": "nld", "limit": 200}
     )
     assert r.status_code == 200
     items = r.json()["items"]
     assert items
     assert all(item["meta_language"] == "nld" for item in items)
-    assert all(item["meta_language_used"] == "eng" for item in items)
+    word = next(item for item in items if item["content_type"] == "word")
+    proverb = next(item for item in items if item["content_type"] == "proverb")
+    assert word["meta_language_used"] == "nld"
+    assert proverb["meta_language_used"] == "eng"
     assert all(item["translation"] for item in items)
 
 
-async def test_one_dutch_translation_produces_a_mixed_page(client, database_url):
-    selected = select_content_row(database_url)
-    with committed_dutch_translations(
-        database_url, [(selected[0], "Unieke Nederlandse vertaling", None, None)]
-    ):
-        r = await client.get(
-            "/v1/content",
-            params={"language": "ibo", "meta_language": "nld", "limit": 10},
-        )
-        assert r.status_code == 200
-        items = r.json()["items"]
-        chosen = next(item for item in items if item["id"] == selected[0])
-        assert chosen["translation"] == "Unieke Nederlandse vertaling"
-        assert chosen["meta_language"] == "nld"
-        assert chosen["meta_language_used"] == "nld"
-        assert all(
-            item["meta_language_used"] == "eng" for item in items if item["id"] != selected[0]
-        )
+async def test_seeded_dutch_translations_produce_a_mixed_page(client):
+    response = await client.get(
+        "/v1/content",
+        params={"language": "ibo", "meta_language": "nld", "limit": 200},
+    )
+
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert sum(item["meta_language_used"] == "nld" for item in items) == 107
+    assert sum(item["meta_language_used"] == "eng" for item in items) == 50
 
 
 async def test_requested_translation_falls_back_each_optional_field_independently(
@@ -286,7 +281,11 @@ async def test_requested_translation_falls_back_each_optional_field_independentl
     proverbs = select_content_rows(
         database_url,
         "c.content_type = 'proverb' AND ct.literal_translation IS NOT NULL "
-        "AND ct.cultural_note IS NOT NULL",
+        "AND ct.cultural_note IS NOT NULL AND NOT EXISTS ("
+        "SELECT 1 FROM content_translations nld_ct "
+        "JOIN languages nld ON nld.id = nld_ct.meta_language_id "
+        "WHERE nld_ct.content_id = c.id AND nld.code = 'nld'"
+        ")",
         expected_count=2,
     )
     dutch_literal = "Nederlandse letterlijke vertaling"
@@ -323,19 +322,18 @@ async def test_requested_translation_falls_back_each_optional_field_independentl
 
 async def test_search_uses_the_resolved_dutch_translation(client, database_url):
     ndewo = select_content_row(database_url, "c.target_text = 'Ndewo'")
-    with committed_dutch_translations(database_url, [(ndewo[0], "hallo", None, None)]):
-        r = await client.get(
-            "/v1/content", params={"language": "ibo", "meta_language": "nld", "q": "hallo"}
-        )
-        assert r.status_code == 200
-        items = r.json()["items"]
-        assert any(
-            item["id"] == ndewo[0]
-            and item["target_text"] == "Ndewo"
-            and item["translation"] == "hallo"
-            and item["meta_language_used"] == "nld"
-            for item in items
-        )
+    r = await client.get(
+        "/v1/content", params={"language": "ibo", "meta_language": "nld", "q": "Hallo"}
+    )
+    assert r.status_code == 200
+    items = r.json()["items"]
+    assert any(
+        item["id"] == ndewo[0]
+        and item["target_text"] == "Ndewo"
+        and item["translation"] == "Hallo"
+        and item["meta_language_used"] == "nld"
+        for item in items
+    )
 
 
 # --- database invariants ----------------------------------------------------
@@ -353,11 +351,18 @@ async def test_seeded_translation_counts(database_url):
             """
         ).fetchall()
 
-    assert dict(rows) == {"eng": 157, "nld": 0}
+    assert dict(rows) == {"eng": 157, "nld": 107}
 
 
 async def test_meta_language_coverage_counts_only_published_content(client, database_url):
-    published = select_content_row(database_url)
+    published = select_content_row(
+        database_url,
+        "c.content_type = 'proverb' AND NOT EXISTS ("
+        "SELECT 1 FROM content_translations nld_ct "
+        "JOIN languages nld ON nld.id = nld_ct.meta_language_id "
+        "WHERE nld_ct.content_id = c.id AND nld.code = 'nld'"
+        ")",
+    )
     draft_key = f"test:draft:{uuid.uuid4()}"
     with db_connection(database_url) as conn:
         dutch_id = conn.execute("SELECT id FROM languages WHERE code = 'nld'").fetchone()[0]
@@ -393,7 +398,7 @@ async def test_meta_language_coverage_counts_only_published_content(client, data
             r = await client.get("/v1/languages/meta")
             assert r.status_code == 200
             dutch = next(row for row in r.json() if row["code"] == "nld")
-            assert dutch["translated_count"] == 1
+            assert dutch["translated_count"] == 108
             assert dutch["total_count"] == 157
         finally:
             if draft_id is not None:
@@ -682,7 +687,7 @@ async def test_study_direction_defaults_to_target_then_swaps_prompt_and_answer(
                   FROM content_items c
                   JOIN content_translations ct ON ct.content_id = c.id
                   JOIN languages ml
-                    ON ml.id = ct.meta_language_id AND ml.code = 'eng'
+                    ON ml.id = ct.meta_language_id AND ml.code = 'nld'
                  WHERE c.id = ANY(%s)
                 """,
                 (list(default_items),),
@@ -691,7 +696,7 @@ async def test_study_direction_defaults_to_target_then_swaps_prompt_and_answer(
     assert seeded.keys() == default_items.keys()
     for item_id, item in default_items.items():
         assert item["meta_language"] == "nld"
-        assert item["meta_language_used"] == "eng"
+        assert item["meta_language_used"] == "nld"
         assert item["prompt"] == seeded[item_id]["target_text"]
         assert item["answer"] == seeded[item_id]["translation"]
         assert reverse_items[item_id]["prompt"] == seeded[item_id]["translation"]
@@ -706,39 +711,17 @@ async def test_quiz_session_has_four_distinct_options_with_one_correct(client):
         assert_well_formed_quiz_options(item)
 
 
-async def test_quiz_options_follow_answer_side_and_each_rows_fallback_language(
-    client, database_url
-):
+async def test_quiz_options_follow_answer_side_for_seeded_dutch(client, database_url):
     path = "/v1/tracks/ibo_foundations/units/2/items"
-    baseline = await client.get(path, params={"shuffle_seed": 7})
-    assert baseline.status_code == 200
-    baseline_items = baseline.json()["items"]
-    selected_id = baseline_items[0]["id"]
-    session_ids = [item["id"] for item in baseline_items]
-
     with db_connection(database_url) as conn:
-        selected_type = conn.execute(
-            "SELECT content_type FROM content_items WHERE id = %s", (selected_id,)
-        ).fetchone()[0]
-        candidates = conn.execute(
-            """
-            SELECT id
-              FROM content_items
-             WHERE status = 'published'
-               AND content_type = %s
-               AND NOT (id = ANY(%s))
-             ORDER BY id
-            """,
-            (selected_type, session_ids),
-        ).fetchall()
-        english_texts = {
+        dutch_texts = {
             row[0]
             for row in conn.execute(
                 """
                 SELECT ct.translation
                   FROM content_translations ct
                   JOIN languages ml ON ml.id = ct.meta_language_id
-                 WHERE ml.code = 'eng'
+                 WHERE ml.code = 'nld'
                 """
             )
         }
@@ -749,52 +732,37 @@ async def test_quiz_options_follow_answer_side_and_each_rows_fallback_language(
             )
         }
 
-    dutch_rows = [(selected_id, f"NL quiz {selected_id}", None, None)] + [
-        (row[0], f"NL quiz {row[0]}", None, None) for row in candidates
-    ]
-    with committed_dutch_translations(database_url, dutch_rows):
-        translated = await client.get(
-            path,
-            params={
-                "meta_language": "nld",
-                "direction": "target_to_meta",
-                "shuffle_seed": 7,
-            },
-        )
-        target = await client.get(
-            path,
-            params={
-                "meta_language": "nld",
-                "direction": "meta_to_target",
-                "shuffle_seed": 7,
-            },
-        )
-        assert translated.status_code == target.status_code == 200
+    translated = await client.get(
+        path,
+        params={
+            "meta_language": "nld",
+            "direction": "target_to_meta",
+            "shuffle_seed": 7,
+        },
+    )
+    target = await client.get(
+        path,
+        params={
+            "meta_language": "nld",
+            "direction": "meta_to_target",
+            "shuffle_seed": 7,
+        },
+    )
+    assert translated.status_code == target.status_code == 200
 
-        translated_items = {item["id"]: item for item in translated.json()["items"]}
-        target_items = {item["id"]: item for item in target.json()["items"]}
-        assert translated_items, "translated-answer quiz returned no items"
-        assert translated_items.keys() == target_items.keys()
-        assert translated_items[selected_id]["meta_language_used"] == "nld"
-        assert all(
-            item["meta_language_used"] == "eng"
-            for item_id, item in translated_items.items()
-            if item_id != selected_id
-        )
+    translated_items = {item["id"]: item for item in translated.json()["items"]}
+    target_items = {item["id"]: item for item in target.json()["items"]}
+    assert translated_items, "translated-answer quiz returned no items"
+    assert translated_items.keys() == target_items.keys()
+    assert all(item["meta_language_used"] == "nld" for item in translated_items.values())
 
-        for item_id, item in translated_items.items():
-            assert_well_formed_quiz_options(item)
-            option_texts = {option["text"] for option in item["options"]}
-            if item["meta_language_used"] == "nld":
-                assert item["answer"] == f"NL quiz {item_id}"
-                assert all(text.startswith("NL quiz ") for text in option_texts)
-            else:
-                assert option_texts <= english_texts
+    for item in translated_items.values():
+        assert_well_formed_quiz_options(item)
+        assert {option["text"] for option in item["options"]} <= dutch_texts
 
-        for item in target_items.values():
-            assert_well_formed_quiz_options(item)
-            option_texts = {option["text"] for option in item["options"]}
-            assert option_texts <= target_texts
+    for item in target_items.values():
+        assert_well_formed_quiz_options(item)
+        assert {option["text"] for option in item["options"]} <= target_texts
 
 
 async def test_proverb_session_returns_the_cultural_lesson(client):
