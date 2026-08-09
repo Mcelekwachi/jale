@@ -7,6 +7,10 @@ import { QuizFeedback } from "../components/QuizFeedback";
 import { Spinner } from "../components/Spinner";
 import { apiFetch } from "../lib/api";
 import { defaultMetaLanguage } from "../lib/locale";
+import {
+  coverageLabel,
+  hasIncompleteCoverage,
+} from "../lib/languageCoverage";
 import type {
   CatalogueLanguage,
   ContentItem,
@@ -372,7 +376,11 @@ export function Onboarding() {
               (catalogue ? (
                 <LanguagePair
                   catalogue={catalogue}
-                  activeLanguage={profile.preferences.active_language}
+                  activeLanguage={
+                    (profile.preferences.onboarding_last_screen ?? 0) >= 3
+                      ? profile.preferences.active_language
+                      : ""
+                  }
                   metaLanguage={
                     profile.preferences.meta_language ?? defaultMetaLanguage()
                   }
@@ -553,21 +561,27 @@ function LanguagePair({
   const selectedMeta = catalogue.meta.find(({ code }) => code === meta);
   return (
     <div className="space-y-6">
-      <LanguageChoices
+      <LanguageSelect
         title="What do you want to learn?"
         languages={catalogue.learnable}
         selected={active}
+        placeholder="Choose a language"
         onSelect={setActive}
       />
-      <LanguageChoices
-        title="What language do you want to learn with?"
-        languages={catalogue.meta}
-        selected={meta}
-        showCoverage
-        onSelect={setMeta}
-      />
+      {active && (
+        <div className="onboarding-screen motion-reduce:animate-none">
+          <LanguageSelect
+            title="What language do you want to learn with?"
+            languages={catalogue.meta}
+            selected={meta}
+            showCoverage
+            onSelect={setMeta}
+          />
+        </div>
+      )}
       {selectedMeta &&
-        (selectedMeta.translated_count ?? 0) < (selectedMeta.total_count ?? 0) && (
+        active &&
+        hasIncompleteCoverage(selectedMeta) && (
         <p className="rounded-xl bg-ochre-soft p-3 text-sm text-indigo-deep">
           {selectedMeta.name} translations are still being written — you&apos;ll
           see English where {selectedMeta.name} isn&apos;t ready yet.
@@ -584,44 +598,50 @@ function LanguagePair({
   );
 }
 
-function LanguageChoices({
+function LanguageSelect({
   title,
   languages,
   selected,
+  placeholder,
   showCoverage = false,
   onSelect,
 }: {
   title: string;
   languages: CatalogueLanguage[];
   selected: string;
+  placeholder?: string;
   showCoverage?: boolean;
   onSelect: (code: string) => void;
 }) {
   return (
-    <fieldset className="space-y-2">
-      <legend className="mb-2 font-semibold text-indigo-deep">{title}</legend>
-      {languages.map((language) => (
-        <button
-          key={language.code}
-          type="button"
-          disabled={!language.available}
-          aria-pressed={selected === language.code}
-          onClick={() => onSelect(language.code)}
-          className={`min-h-11 w-full rounded-2xl border-2 px-4 py-3 text-left ${selected === language.code ? "border-ochre bg-ochre-soft" : "border-sand bg-white"} disabled:cursor-not-allowed disabled:opacity-60`}
-        >
-          <span className="font-semibold">{languageLabel(language)}</span>
-          {!language.available && (
-            <span className="ml-2 text-sm">Coming soon</span>
-          )}
-          {showCoverage && (
-            <small className="block text-muted">
-              {language.translated_count ?? 0}/{language.total_count ?? 0}{" "}
-              translated
-            </small>
-          )}
-        </button>
-      ))}
-    </fieldset>
+    <label className="grid gap-2 font-semibold text-indigo-deep">
+      {title}
+      <select
+        value={selected}
+        onChange={(event) => onSelect(event.target.value)}
+        className="min-h-11 w-full rounded-xl border border-sand bg-white px-3 text-ink"
+      >
+        {placeholder && (
+          <option value="" disabled>
+            {placeholder}
+          </option>
+        )}
+        {languages.map((language) => {
+          const coverage = showCoverage ? coverageLabel(language) : null;
+          return (
+            <option
+              key={language.code}
+              value={language.code}
+              disabled={!language.available}
+            >
+              {languageLabel(language)}
+              {!language.available ? " — Coming soon" : ""}
+              {coverage ? ` — ${coverage}` : ""}
+            </option>
+          );
+        })}
+      </select>
+    </label>
   );
 }
 
