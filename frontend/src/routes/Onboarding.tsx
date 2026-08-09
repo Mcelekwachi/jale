@@ -15,9 +15,9 @@ import type {
 import { OptionList } from "../onboarding/OptionList";
 import {
   ageChoices,
-  connectionChoices,
+  connectionChoicesFor,
   dailyChoices,
-  goalChoices,
+  goalChoicesFor,
   styleChoices,
 } from "../onboarding/options";
 
@@ -238,14 +238,17 @@ export function Onboarding() {
       />
     ) : step === 3 ? (
       <OptionList
-        choices={connectionChoices}
+        choices={connectionChoicesFor(preferences?.age_band)}
         selected={preferences?.connection}
         disabled={busy}
         onSelect={(value) => void save({ connection: value }, 4)}
       />
     ) : step === 4 ? (
       <OptionList
-        choices={goalChoices}
+        choices={goalChoicesFor(
+          preferences?.age_band,
+          preferences?.connection,
+        )}
         selected={preferences?.goal}
         disabled={busy}
         onSelect={(value) => void save({ goal: value }, 5)}

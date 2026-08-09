@@ -11,9 +11,9 @@ import type { MetaLanguage, UserPreferences, UserProfile } from "../lib/types";
 import { OptionList } from "../onboarding/OptionList";
 import {
   ageChoices,
-  connectionChoices,
+  connectionChoicesFor,
   dailyChoices,
-  goalChoices,
+  goalChoicesFor,
   placementChoices,
   styleChoices,
 } from "../onboarding/options";
@@ -147,7 +147,7 @@ export function Settings() {
         </SettingSection>
         <SettingSection title="Your connection">
           <OptionList
-            choices={connectionChoices}
+            choices={connectionChoicesFor(preferences.age_band)}
             selected={preferences.connection}
             disabled={Boolean(saving)}
             onSelect={(value) => void update("connection", value)}
@@ -155,7 +155,10 @@ export function Settings() {
         </SettingSection>
         <SettingSection title="Your goal">
           <OptionList
-            choices={goalChoices}
+            choices={goalChoicesFor(
+              preferences.age_band,
+              preferences.connection,
+            )}
             selected={preferences.goal}
             disabled={Boolean(saving)}
             onSelect={(value) => void update("goal", value)}

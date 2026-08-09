@@ -41,6 +41,33 @@ export const goalChoices: Choice<Goal>[] = [
   },
 ];
 
+const childConnections = new Set<Connection>([
+  "igbo_parent_abroad",
+  "mixed_parent_abroad",
+]);
+
+const childGoals = new Set<Goal>([
+  "teach_my_children",
+  "academic_professional",
+  "improve_proverbs_vocab",
+]);
+
+export function connectionChoicesFor(ageBand: AgeBand | null | undefined) {
+  return ageBand === "child_u13"
+    ? connectionChoices.filter(({ value }) => !childConnections.has(value))
+    : connectionChoices;
+}
+
+export function goalChoicesFor(
+  ageBand: AgeBand | null | undefined,
+  connection: Connection | null | undefined,
+) {
+  return goalChoices.filter(({ value }) => {
+    if (ageBand === "child_u13" && childGoals.has(value)) return false;
+    return !(connection === "aboriginal_native" && value === "new_language");
+  });
+}
+
 export const styleChoices: Choice<LearningStyle>[] = [
   { label: "Games and points", value: "game_points" },
   { label: "Clean structured lessons", value: "structured_lessons" },
