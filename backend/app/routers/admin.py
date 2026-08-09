@@ -14,6 +14,7 @@ from app.admin_schemas import (
     AdminFlagQueueItem,
     AdminTranslationPatch,
     AdminTranslationState,
+    AdminVerificationResult,
     BulkFlagResolution,
     BulkFlagResolutionResult,
     ContributorGrant,
@@ -112,7 +113,7 @@ async def edit_translation(
 
 @router.post(
     "/content/{content_id}/verify",
-    response_model=AdminContentState | AdminTranslationState,
+    response_model=AdminVerificationResult,
 )
 async def verify_content(content_id: int, payload: VerificationChange, user: AdminUser) -> dict:
     return await admin.set_verified(
@@ -122,7 +123,7 @@ async def verify_content(content_id: int, payload: VerificationChange, user: Adm
 
 @router.post(
     "/content/{content_id}/unverify",
-    response_model=AdminContentState | AdminTranslationState,
+    response_model=AdminVerificationResult,
 )
 async def unverify_content(content_id: int, payload: VerificationChange, user: AdminUser) -> dict:
     return await admin.set_verified(

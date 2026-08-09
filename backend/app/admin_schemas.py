@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, RootModel, model_validator
 
 from app.schemas import ContentType, Difficulty, FlagReason
 
@@ -118,6 +118,10 @@ class AdminTranslationState(BaseModel):
     contributor_id: UUID | None
     created_at: datetime
     updated_at: datetime
+
+
+class AdminVerificationResult(RootModel[AdminContentState | AdminTranslationState]):
+    pass
 
 
 class AdminContentRevision(BaseModel):

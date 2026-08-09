@@ -94,10 +94,11 @@ def test_admin_data_endpoints_publish_named_response_models():
         response_schema = schema["paths"][f"/v1/admin/content/{{content_id}}/{method}"]["post"][
             "responses"
         ]["200"]["content"]["application/json"]["schema"]
-        refs = {choice.get("$ref") for choice in response_schema["anyOf"]}
-        assert refs == {
-            "#/components/schemas/AdminContentState",
-            "#/components/schemas/AdminTranslationState",
-        }
+        assert response_schema == {"$ref": "#/components/schemas/AdminVerificationResult"}
 
     assert "AdminFlagQueueFlag" in schema["components"]["schemas"]
+    verification_result = schema["components"]["schemas"]["AdminVerificationResult"]
+    assert {choice["$ref"] for choice in verification_result["anyOf"]} == {
+        "#/components/schemas/AdminContentState",
+        "#/components/schemas/AdminTranslationState",
+    }
