@@ -170,7 +170,16 @@ export interface MetaLanguage {
   total_count: number;
 }
 
-export type CatalogueLanguage = MetaLanguage;
+export interface CatalogueLanguage {
+  code: string;
+  name: string;
+  endonym?: string | null;
+  flag_emoji?: string | null;
+  available: boolean;
+  content_count?: number;
+  translated_count?: number;
+  total_count?: number;
+}
 
 export interface LanguageCatalogue {
   learnable: CatalogueLanguage[];

@@ -566,7 +566,8 @@ function LanguagePair({
         showCoverage
         onSelect={setMeta}
       />
-      {selectedMeta && selectedMeta.translated_count < selectedMeta.total_count && (
+      {selectedMeta &&
+        (selectedMeta.translated_count ?? 0) < (selectedMeta.total_count ?? 0) && (
         <p className="rounded-xl bg-ochre-soft p-3 text-sm text-indigo-deep">
           {selectedMeta.name} translations are still being written — you&apos;ll
           see English where {selectedMeta.name} isn&apos;t ready yet.
@@ -603,16 +604,19 @@ function LanguageChoices({
         <button
           key={language.code}
           type="button"
-          disabled={!language.is_active}
+          disabled={!language.available}
           aria-pressed={selected === language.code}
           onClick={() => onSelect(language.code)}
           className={`min-h-11 w-full rounded-2xl border-2 px-4 py-3 text-left ${selected === language.code ? "border-ochre bg-ochre-soft" : "border-sand bg-white"} disabled:cursor-not-allowed disabled:opacity-60`}
         >
           <span className="font-semibold">{languageLabel(language)}</span>
-          {!language.is_active && <span className="ml-2 text-sm">Coming soon</span>}
+          {!language.available && (
+            <span className="ml-2 text-sm">Coming soon</span>
+          )}
           {showCoverage && (
             <small className="block text-muted">
-              {language.translated_count}/{language.total_count} translated
+              {language.translated_count ?? 0}/{language.total_count ?? 0}{" "}
+              translated
             </small>
           )}
         </button>

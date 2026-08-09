@@ -26,6 +26,8 @@ function setup(mode: string, item: StudyItem = baseItem) {
       return { preferences: { meta_language: "eng" } } as never;
     if (path === "/v1/languages/meta")
       return [{ code: "eng", name: "English" }] as never;
+    if (path === "/v1/me/track")
+      return { track: { name: "Igbo Foundations" } } as never;
     if (String(path).includes("/items"))
       return {
         track: "foundations",
@@ -58,7 +60,7 @@ describe("Study", () => {
   it("renders flashcards with reveal and rating controls", async () => {
     setup("flashcard");
     expect(await screen.findByText("Ndewo")).toBeInTheDocument();
-    expect(screen.getByText(/foundations.*greetings/i)).toBeInTheDocument();
+    expect(screen.getByText(/Igbo Foundations.*Greetings/i)).toBeInTheDocument();
     expect(screen.getByText("Item 1 of 1")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /reveal/i }));
     expect(screen.getByText("Hello")).toBeInTheDocument();

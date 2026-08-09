@@ -17,11 +17,11 @@ const mockedApiFetch = vi.mocked(apiFetch);
 
 const catalogue = {
   learnable: [
-    { code: "ibo", name: "Igbo", endonym: "Asụsụ Igbo", is_active: true, translated_count: 157, total_count: 157 },
+    { code: "ibo", name: "Igbo", endonym: "Asụsụ Igbo", available: true, content_count: 157 },
   ],
   meta: [
-    { code: "eng", name: "English", endonym: "English", is_active: true, translated_count: 157, total_count: 157 },
-    { code: "nld", name: "Dutch", endonym: "Nederlands", is_active: true, translated_count: 0, total_count: 157 },
+    { code: "eng", name: "English", endonym: "English", available: true, translated_count: 157, total_count: 157 },
+    { code: "nld", name: "Dutch", endonym: "Nederlands", available: true, translated_count: 0, total_count: 157 },
   ],
 };
 
@@ -77,7 +77,7 @@ describe("onboarding", () => {
               code: "ibo",
               name: "Igbo",
               endonym: "Asụsụ Igbo",
-              is_active: true,
+              available: true,
               translated_count: 157,
               total_count: 157,
             },
@@ -85,7 +85,7 @@ describe("onboarding", () => {
               code: "yor",
               name: "Yoruba",
               endonym: "Èdè Yorùbá",
-              is_active: false,
+              available: false,
               translated_count: 0,
               total_count: 0,
             },
@@ -95,7 +95,7 @@ describe("onboarding", () => {
               code: "eng",
               name: "English",
               endonym: "English",
-              is_active: true,
+              available: true,
               translated_count: 157,
               total_count: 157,
             },
@@ -103,7 +103,7 @@ describe("onboarding", () => {
               code: "nld",
               name: "Dutch",
               endonym: "Nederlands",
-              is_active: true,
+              available: true,
               translated_count: 0,
               total_count: 157,
             },
