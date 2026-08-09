@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { apiFetch } from "../lib/api";
 import type { StudyItem } from "../lib/types";
 import { Study } from "./Study";
@@ -54,6 +54,7 @@ function setup(mode: string, item: StudyItem = baseItem) {
 
 describe("Study", () => {
   beforeEach(() => vi.mocked(apiFetch).mockReset());
+  afterEach(() => vi.unstubAllGlobals());
   it("renders flashcards with reveal and rating controls", async () => {
     setup("flashcard");
     expect(await screen.findByText("Ndewo")).toBeInTheDocument();
@@ -99,8 +100,83 @@ describe("Study", () => {
     });
     await screen.findByText("Hello");
     await userEvent.click(screen.getByRole("button", { name: "Ndewo" }));
-    expect(screen.getByText(/correct/i)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(/correct/i);
     expect(screen.getByRole("button", { name: "Daalụ" })).toBeDisabled();
+  });
+  it("marks a wrong choice and reveals the correct choice with text and icons", async () => {
+    setup("quiz", {
+      ...baseItem,
+      prompt: "Hello",
+      options: [
+        { text: "Ndewo", is_correct: true },
+        { text: "Daalụ", is_correct: false },
+      ],
+    });
+    await screen.findByText("Hello");
+
+    await userEvent.click(screen.getByRole("button", { name: "Daalụ" }));
+
+    expect(screen.getByRole("button", { name: /Daalụ.*Your answer.*Incorrect/i }))
+      .toHaveTextContent("✕");
+    expect(screen.getByRole("button", { name: /Ndewo.*Correct answer/i }))
+      .toHaveTextContent("✓");
+  });
+  it("marks only the selected option when the answer is right", async () => {
+    setup("quiz", {
+      ...baseItem,
+      prompt: "Hello",
+      options: [
+        { text: "Ndewo", is_correct: true },
+        { text: "Daalụ", is_correct: false },
+      ],
+    });
+    await screen.findByText("Hello");
+
+    await userEvent.click(screen.getByRole("button", { name: "Ndewo" }));
+
+    expect(screen.getByRole("button", { name: /Ndewo.*Your answer.*Correct/i }))
+      .toHaveTextContent("✓");
+    expect(screen.getByRole("button", { name: "Daalụ" })).not.toHaveTextContent(
+      /correct|incorrect/i,
+    );
+  });
+  it("lets a fast user continue before automatic advancement", async () => {
+    setup("quiz", {
+      ...baseItem,
+      prompt: "Hello",
+      options: [
+        { text: "Ndewo", is_correct: true },
+        { text: "Daalụ", is_correct: false },
+      ],
+    });
+    await screen.findByText("Hello");
+    await userEvent.click(screen.getByRole("button", { name: "Ndewo" }));
+
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(await screen.findByRole("heading", { name: "Session complete" }))
+      .toBeInTheDocument();
+  });
+  it("removes the feedback transition for reduced motion", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === "(prefers-reduced-motion: reduce)",
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    setup("quiz", {
+      ...baseItem,
+      prompt: "Hello",
+      options: [
+        { text: "Ndewo", is_correct: true },
+        { text: "Daalụ", is_correct: false },
+      ],
+    });
+    await screen.findByText("Hello");
+    await userEvent.click(screen.getByRole("button", { name: "Ndewo" }));
+
+    expect(screen.getByRole("button", { name: /Ndewo.*Correct/i })).not
+      .toHaveClass("transition-colors");
   });
   it("refetches in both directions when toggled twice around an answer", async () => {
     setup("quiz", {

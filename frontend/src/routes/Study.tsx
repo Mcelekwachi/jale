@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { QuizFeedback } from "../components/QuizFeedback";
 import { Spinner } from "../components/Spinner";
 import { apiFetch } from "../lib/api";
 import { defaultMetaLanguage } from "../lib/locale";
@@ -27,7 +28,6 @@ export function Study() {
   const [direction, setDirection] = useState<StudyDirection>("target_to_meta");
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
-  const [selected, setSelected] = useState<number | null>(null);
   const [shownAt, setShownAt] = useState(Date.now());
   const [correct, setCorrect] = useState(0);
   const [summary, setSummary] = useState<AnswerResponse | null>(null);
@@ -52,7 +52,6 @@ export function Study() {
     setSession(null);
     setIndex(0);
     setRevealed(false);
-    setSelected(null);
     void Promise.all([
       apiFetch<UserProfile>("/v1/me", { authenticated: true }),
       apiFetch<MetaLanguage[]>("/v1/languages/meta"),
@@ -106,7 +105,6 @@ export function Study() {
     if (index + 1 < session.items.length) {
       setIndex(index + 1);
       setRevealed(false);
-      setSelected(null);
       setShownAt(Date.now());
       setAdvancing(false);
     } else {
@@ -247,15 +245,14 @@ export function Study() {
             {item.prompt}
           </h1>
           {session.mode === "quiz" ? (
-            <Quiz
-              item={item}
-              selected={selected}
-              onSelect={(choice) => {
-                if (selected !== null) return;
-                setSelected(choice);
-                void record(Boolean(item.options?.[choice].is_correct));
-              }}
-              onNext={() => void advance()}
+            <QuizFeedback
+              key={`${direction}-${item.id}`}
+              choices={(item.options ?? []).map((option) => ({
+                label: option.text,
+                isCorrect: option.is_correct,
+              }))}
+              onSelect={(choice) => void record(choice.isCorrect)}
+              onContinue={() => void advance()}
               disabled={advancing}
             />
           ) : (
@@ -343,53 +340,6 @@ function Reveal({
           I knew it
         </button>
       </div>
-    </div>
-  );
-}
-function Quiz({
-  item,
-  selected,
-  onSelect,
-  onNext,
-  disabled,
-}: {
-  item: StudyItem;
-  selected: number | null;
-  onSelect: (i: number) => void;
-  onNext: () => void;
-  disabled: boolean;
-}) {
-  return (
-    <div className="mt-8 space-y-3">
-      {(item.options ?? []).map((option, i) => (
-        <button
-          key={option.text}
-          disabled={selected !== null}
-          onClick={() => onSelect(i)}
-          className="min-h-12 w-full rounded-xl border border-sand bg-white px-4 text-left disabled:opacity-100"
-        >
-          {selected !== null && option.is_correct
-            ? "✓ "
-            : selected === i
-              ? "✕ "
-              : ""}
-          {option.text}
-        </button>
-      ))}
-      {selected !== null && (
-        <>
-          <p role="status" className="font-bold">
-            {item.options?.[selected].is_correct ? "✓ Correct" : "✕ Not quite"}
-          </p>
-          <button
-            disabled={disabled}
-            onClick={onNext}
-            className="min-h-12 w-full rounded-xl bg-indigo-deep font-bold text-cream"
-          >
-            Continue
-          </button>
-        </>
-      )}
     </div>
   );
 }
