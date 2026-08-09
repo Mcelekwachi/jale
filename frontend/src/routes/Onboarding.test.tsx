@@ -248,6 +248,17 @@ describe("onboarding", () => {
   });
 
   it("skips from screen four with its current screen", async () => {
+    let skipped = false;
+    mockedApiFetch.mockImplementation(async (path) => {
+      if (path === "/v1/me/onboarding/skip") {
+        skipped = true;
+        return profile({ onboarding_status: "skipped" }) as never;
+      }
+      if (path === "/v1/me")
+        return profile({ onboarding_status: skipped ? "skipped" : "not_started" }) as never;
+      if (path === "/v1/languages/catalogue") return catalogue as never;
+      return profile() as never;
+    });
     renderPath("/onboarding/4");
     await userEvent.click(
       await screen.findByRole("button", { name: /skip for now/i }),
