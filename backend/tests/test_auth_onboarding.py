@@ -625,6 +625,49 @@ async def test_skip_onboarding_records_screen_four(client, database_url, user_id
         assert preferences["onboarding_last_screen"] == 4
 
 
+async def test_onboarding_screen_ten_is_accepted_by_preferences_and_skip(
+    client, database_url, user_id, auth_headers
+):
+    headers = auth_headers(subject=user_id)
+    with remove_test_users(database_url, user_id):
+        preferences_response = await client.patch(
+            "/v1/me/preferences",
+            headers=headers,
+            json={"onboarding_last_screen": 10},
+        )
+        skip_response = await client.post(
+            "/v1/me/onboarding/skip",
+            headers=headers,
+            json={"onboarding_last_screen": 10},
+        )
+
+    assert preferences_response.status_code == 200
+    assert preferences_response.json()["preferences"]["onboarding_last_screen"] == 10
+    assert skip_response.status_code == 200
+    assert skip_response.json()["preferences"]["onboarding_last_screen"] == 10
+
+
+@pytest.mark.parametrize("screen", [0, 21])
+async def test_onboarding_screen_outside_sanity_bound_is_rejected(
+    client, user_id, auth_headers, screen
+):
+    headers = auth_headers(subject=user_id)
+
+    preferences_response = await client.patch(
+        "/v1/me/preferences",
+        headers=headers,
+        json={"onboarding_last_screen": screen},
+    )
+    skip_response = await client.post(
+        "/v1/me/onboarding/skip",
+        headers=headers,
+        json={"onboarding_last_screen": screen},
+    )
+
+    assert preferences_response.status_code == 422
+    assert skip_response.status_code == 422
+
+
 async def test_skip_without_body_preserves_existing_screen(
     client, database_url, user_id, auth_headers
 ):

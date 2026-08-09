@@ -356,7 +356,8 @@ class PreferencesPatch(BaseModel):
     reminder_time: time | None = None
     timezone: str | None = None
     placement_level: Difficulty | None = None
-    onboarding_last_screen: int | None = Field(default=None, ge=1, le=8)
+    # 20 is a sanity bound against absurd input, not the number of onboarding screens.
+    onboarding_last_screen: int | None = Field(default=None, ge=1, le=20)
 
     @field_validator("timezone")
     @classmethod
@@ -388,7 +389,8 @@ class PreferencesPatch(BaseModel):
 class SkipOnboarding(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    onboarding_last_screen: int | None = Field(default=None, ge=1, le=8)
+    # 20 is a sanity bound against absurd input, not the number of onboarding screens.
+    onboarding_last_screen: int | None = Field(default=None, ge=1, le=20)
 
 
 def patch_values(model: BaseModel) -> dict[str, Any]:
