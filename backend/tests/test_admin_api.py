@@ -308,3 +308,125 @@ async def test_translation_verification_contributors_and_user_search(
         finally:
             with db_connection(database_url) as conn:
                 conn.execute("DELETE FROM content_items WHERE id=%s", (content_id,))
+
+
+async def test_admin_content_filters_match_public_filter_semantics(
+    client, database_url, auth_headers
+):
+    admin_id, admin_headers = await provision_admin(client, database_url, auth_headers)
+    marker = uuid.uuid4().hex
+    content_ids: list[int] = []
+    with isolated_test_users(admin_id):
+        try:
+            with db_connection(database_url) as conn:
+                language_id = conn.execute("SELECT id FROM languages WHERE code='ibo'").fetchone()[
+                    0
+                ]
+                meta_id = conn.execute("SELECT id FROM languages WHERE code='eng'").fetchone()[0]
+                category_id, category_slug = conn.execute(
+                    "SELECT id, slug FROM categories WHERE language_id=%s ORDER BY id LIMIT 1",
+                    (language_id,),
+                ).fetchone()
+                proverb_id = conn.execute(
+                    """INSERT INTO content_items
+                           (source_key, language_id, category_id, content_type,
+                            difficulty_level, target_text, verified, sort_order)
+                       VALUES (%s,%s,%s,'proverb','advanced',%s,false,-1000)
+                       RETURNING id""",
+                    (
+                        f"test:admin-filter:{marker}:proverb",
+                        language_id,
+                        category_id,
+                        f"target-{marker}",
+                    ),
+                ).fetchone()[0]
+                translated_id = conn.execute(
+                    """INSERT INTO content_items
+                           (source_key, language_id, content_type, target_text)
+                       VALUES (%s,%s,'word',%s)
+                       RETURNING id""",
+                    (
+                        f"test:admin-filter:{marker}:word",
+                        language_id,
+                        f"unrelated-{marker}",
+                    ),
+                ).fetchone()[0]
+                content_ids.extend((proverb_id, translated_id))
+                conn.execute(
+                    """INSERT INTO content_translations
+                           (content_id, meta_language_id, translation, cultural_note)
+                       VALUES (%s,%s,%s,'Test note'), (%s,%s,%s,NULL)""",
+                    (
+                        proverb_id,
+                        meta_id,
+                        "Proverb translation",
+                        translated_id,
+                        meta_id,
+                        f"translated-{marker}",
+                    ),
+                )
+                conn.execute(
+                    """INSERT INTO content_flags (content_id, user_id, reason)
+                       VALUES (%s,%s,'other')""",
+                    (proverb_id, admin_id),
+                )
+
+            proverb_response = await client.get(
+                "/v1/admin/content?content_type=proverb", headers=admin_headers
+            )
+            assert proverb_response.status_code == 200
+            assert proverb_id in {item["id"] for item in proverb_response.json()["items"]}
+            assert all(
+                item["content_type"] == "proverb" for item in proverb_response.json()["items"]
+            )
+
+            difficulty_response = await client.get(
+                "/v1/admin/content?difficulty=advanced", headers=admin_headers
+            )
+            assert difficulty_response.status_code == 200
+            assert proverb_id in {item["id"] for item in difficulty_response.json()["items"]}
+            assert all(
+                item["difficulty_level"] == "advanced"
+                for item in difficulty_response.json()["items"]
+            )
+
+            category_response = await client.get(
+                f"/v1/admin/content?category={category_slug}", headers=admin_headers
+            )
+            assert category_response.status_code == 200
+            assert proverb_id in {item["id"] for item in category_response.json()["items"]}
+            assert all(
+                item["category"] == category_slug for item in category_response.json()["items"]
+            )
+
+            target_response = await client.get(
+                f"/v1/admin/content?q=target-{marker}", headers=admin_headers
+            )
+            assert {item["id"] for item in target_response.json()["items"]} == {proverb_id}
+
+            translation_response = await client.get(
+                f"/v1/admin/content?q=translated-{marker}", headers=admin_headers
+            )
+            assert {item["id"] for item in translation_response.json()["items"]} == {translated_id}
+
+            composed_response = await client.get(
+                "/v1/admin/content?verified=false&content_type=proverb&has_flags=true",
+                headers=admin_headers,
+            )
+            assert composed_response.status_code == 200
+            assert proverb_id in {item["id"] for item in composed_response.json()["items"]}
+            assert all(
+                not item["verified"]
+                and item["content_type"] == "proverb"
+                and item["flag_count"] > 0
+                for item in composed_response.json()["items"]
+            )
+
+            invalid = await client.get(
+                "/v1/admin/content?content_type=not_real", headers=admin_headers
+            )
+            assert invalid.status_code == 422
+        finally:
+            if content_ids:
+                with db_connection(database_url) as conn:
+                    conn.execute("DELETE FROM content_items WHERE id=ANY(%s)", (content_ids,))

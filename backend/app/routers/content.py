@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
 
 from app.config import get_settings
+from app.content_filters import content_filter_sql
 from app.db import fetch_all, fetch_one
 from app.schemas import ContentItem, ContentPage, ContentType, Difficulty
 from app.services.meta_languages import resolve_meta_languages
@@ -38,17 +39,7 @@ _SELECT = """
 _WHERE = """
      WHERE c.status = 'published'
        AND l.code = %(language)s
-       AND (%(content_type)s::content_type IS NULL OR c.content_type = %(content_type)s)
-       AND (%(difficulty)s::difficulty_level IS NULL OR c.difficulty_level = %(difficulty)s)
-       AND (%(category)s::text IS NULL OR cat.slug = %(category)s)
-       AND (%(verified)s::boolean IS NULL OR c.verified = %(verified)s)
-       AND (
-             %(q)s::text IS NULL
-             OR c.target_text ILIKE '%%' || %(q)s || '%%'
-             OR COALESCE(requested_ct.translation, default_ct.translation)
-                ILIKE '%%' || %(q)s || '%%'
-           )
-"""
+    """ + content_filter_sql("COALESCE(requested_ct.translation, default_ct.translation)")
 
 
 @router.get("", response_model=ContentPage)
