@@ -8,6 +8,7 @@ from psycopg.errors import RaiseException
 from psycopg.types.json import Jsonb
 
 from app.config import get_settings
+from app.content_filters import content_filter_sql
 from app.db import get_pool
 
 
@@ -84,6 +85,10 @@ async def bulk_resolve_flags(content_id: int, admin_id: UUID, note: str | None) 
 
 async def list_content(
     *,
+    content_type: str | None,
+    difficulty: str | None,
+    category: str | None,
+    q: str | None,
     status: str | None,
     verified: bool | None,
     audio_state: str | None,
@@ -92,6 +97,10 @@ async def list_content(
     offset: int,
 ) -> dict:
     params = {
+        "content_type": content_type,
+        "difficulty": difficulty,
+        "category": category,
+        "q": q,
         "status": status,
         "verified": verified,
         "audio_state": audio_state,
@@ -102,13 +111,20 @@ async def list_content(
     }
     where = """
       WHERE (%(status)s::content_status IS NULL OR c.status=%(status)s)
-        AND (%(verified)s::boolean IS NULL OR c.verified=%(verified)s)
         AND (%(audio_state)s::audio_status IS NULL OR c.audio_state=%(audio_state)s)
         AND (%(has_flags)s::boolean IS NULL OR (c.flag_count > 0)=%(has_flags)s)
+        """ + content_filter_sql("ct.translation")
+    joins = """
+      JOIN languages l ON l.id=c.language_id
+      LEFT JOIN categories cat ON cat.id=c.category_id
+      LEFT JOIN languages ml ON ml.code=%(default_meta)s
+      LEFT JOIN content_translations ct ON ct.content_id=c.id AND ct.meta_language_id=ml.id
     """
     async with get_pool().connection() as conn:
         total = await (
-            await conn.execute("SELECT count(*)::int AS n FROM content_items c" + where, params)
+            await conn.execute(
+                "SELECT count(*)::int AS n FROM content_items c" + joins + where, params
+            )
         ).fetchone()
         rows = await (
             await conn.execute(
@@ -119,11 +135,8 @@ async def list_content(
                    c.status, c.verified, c.flag_count, c.sort_order,
                    c.created_at, c.updated_at
               FROM content_items c
-              JOIN languages l ON l.id=c.language_id
-              LEFT JOIN categories cat ON cat.id=c.category_id
-              LEFT JOIN languages ml ON ml.code=%(default_meta)s
-              LEFT JOIN content_translations ct ON ct.content_id=c.id AND ct.meta_language_id=ml.id
             """
+                + joins
                 + where
                 + " ORDER BY c.sort_order, c.id LIMIT %(limit)s OFFSET %(offset)s",
                 params,

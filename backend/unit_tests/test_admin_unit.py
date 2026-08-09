@@ -65,3 +65,40 @@ def test_admin_email_matching_is_trimmed_and_case_insensitive(monkeypatch):
     assert settings.is_admin_email("founder@example.com")
     assert settings.is_admin_email(" ADMIN@example.COM ")
     assert not settings.is_admin_email("learner@example.com")
+
+
+def test_admin_data_endpoints_publish_named_response_models():
+    schema = create_app().openapi()
+
+    expected_refs = {
+        ("/v1/admin/flags", "get"): "AdminFlagQueueItem",
+        ("/v1/admin/flags/{flag_id}", "patch"): "AdminFlagDecisionResult",
+        ("/v1/admin/content/{content_id}/flags/resolve", "post"): "BulkFlagResolutionResult",
+        ("/v1/admin/content", "get"): "AdminContentPage",
+        ("/v1/admin/content/{content_id}", "patch"): "AdminContentState",
+        (
+            "/v1/admin/content/{content_id}/translations/{meta_language}",
+            "patch",
+        ): "AdminTranslationState",
+        ("/v1/admin/content/{content_id}/revisions", "get"): "AdminContentRevision",
+    }
+
+    for (path, method), model in expected_refs.items():
+        response_schema = schema["paths"][path][method]["responses"]["200"]["content"][
+            "application/json"
+        ]["schema"]
+        refs = {response_schema.get("$ref"), response_schema.get("items", {}).get("$ref")}
+        assert f"#/components/schemas/{model}" in refs, (path, method, response_schema)
+
+    for method in ("verify", "unverify"):
+        response_schema = schema["paths"][f"/v1/admin/content/{{content_id}}/{method}"]["post"][
+            "responses"
+        ]["200"]["content"]["application/json"]["schema"]
+        assert response_schema == {"$ref": "#/components/schemas/AdminVerificationResult"}
+
+    assert "AdminFlagQueueFlag" in schema["components"]["schemas"]
+    verification_result = schema["components"]["schemas"]["AdminVerificationResult"]
+    assert {choice["$ref"] for choice in verification_result["anyOf"]} == {
+        "#/components/schemas/AdminContentState",
+        "#/components/schemas/AdminTranslationState",
+    }
