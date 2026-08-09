@@ -89,6 +89,14 @@ describe("onboarding", () => {
               translated_count: 0,
               total_count: 0,
             },
+            {
+              code: "hau",
+              name: "Hausa",
+              endonym: "Harshen Hausa",
+              available: true,
+              translated_count: 0,
+              total_count: 0,
+            },
           ],
           meta: [
             {
@@ -114,10 +122,47 @@ describe("onboarding", () => {
 
     renderPath("/onboarding/2");
 
-    expect(await screen.findByText("Igbo · Asụsụ Igbo")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Èdè Yorùbá.*coming soon/i })).toBeDisabled();
-    await userEvent.click(screen.getByRole("button", { name: /Dutch · Nederlands/i }));
+    const target = await screen.findByLabelText("What do you want to learn?");
+    expect(target).toBeInstanceOf(HTMLSelectElement);
+    expect(
+      screen.queryByLabelText("What language do you want to learn with?"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: /Èdè Yorùbá.*coming soon/i }),
+    ).toBeDisabled();
+
+    await userEvent.selectOptions(target, "ibo");
+    const meta = screen.getByLabelText(
+      "What language do you want to learn with?",
+    );
+    expect(meta).toBeInstanceOf(HTMLSelectElement);
+    expect(
+      screen.queryByRole("option", { name: /English.*157\/157/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: /Dutch.*0\/157 translated/i }),
+    ).toBeInTheDocument();
+
+    await userEvent.selectOptions(meta, "nld");
     expect(screen.getByText(/Dutch translations are still being written/i)).toBeInTheDocument();
+
+    await userEvent.selectOptions(target, "hau");
+    expect(meta).toHaveValue("nld");
+    expect(mockedApiFetch).not.toHaveBeenCalledWith(
+      "/v1/me/preferences",
+      expect.anything(),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(mockedApiFetch).toHaveBeenCalledWith(
+      "/v1/me/preferences",
+      expect.objectContaining({
+        body: JSON.stringify({
+          active_language: "hau",
+          meta_language: "nld",
+          onboarding_last_screen: 3,
+        }),
+      }),
+    );
   });
 
   it("patches only the screen answer and reached screen before advancing", async () => {

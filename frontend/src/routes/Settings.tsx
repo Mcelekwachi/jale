@@ -7,6 +7,7 @@ import { ErrorMessage } from "../components/ErrorMessage";
 import { Spinner } from "../components/Spinner";
 import { apiFetch } from "../lib/api";
 import { defaultMetaLanguage } from "../lib/locale";
+import { coverageLabel } from "../lib/languageCoverage";
 import type { MetaLanguage, UserPreferences, UserProfile } from "../lib/types";
 import { OptionList } from "../onboarding/OptionList";
 import {
@@ -195,7 +196,9 @@ export function Settings() {
         <SettingSection title="Explanation language">
           <OptionList
             choices={languages.map((language) => ({
-              label: `${language.name} — ${language.translated_count}/${language.total_count} translated`,
+              label: [language.name, coverageLabel(language)]
+                .filter(Boolean)
+                .join(" — "),
               value: language.code,
             }))}
             selected={selectedMeta}

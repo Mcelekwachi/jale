@@ -59,6 +59,7 @@ describe("settings", () => {
     render(<App />);
 
     expect(await screen.findByText(/Dutch.*0.*157/i)).toBeInTheDocument();
+    expect(screen.queryByText(/English.*157.*157/i)).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Dutch/i }));
     expect(mockedApiFetch).toHaveBeenCalledWith(
       "/v1/me/preferences",
