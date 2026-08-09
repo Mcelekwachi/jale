@@ -34,7 +34,6 @@ export function Study() {
   const [error, setError] = useState<string | null>(null);
   const [retry, setRetry] = useState(false);
   const [queueError, setQueueError] = useState(false);
-  const [hasAnswered, setHasAnswered] = useState(false);
   const [advancing, setAdvancing] = useState(false);
   const [slow, setSlow] = useState(false);
   const queue = useMemo(
@@ -88,7 +87,6 @@ export function Study() {
   const record = async (isCorrect: boolean) => {
     if (!session) return;
     setCorrect((value) => value + Number(isCorrect));
-    setHasAnswered(true);
     try {
       await queue.add({
         content_id: session.items[index].id,
@@ -182,7 +180,6 @@ export function Study() {
                 setSummary(null);
                 setIndex(0);
                 setCorrect(0);
-                setHasAnswered(false);
                 setAdvancing(false);
                 setRevealed(false);
                 setShownAt(Date.now());
@@ -230,14 +227,12 @@ export function Study() {
         )}
         <div className="my-4 grid grid-cols-2 rounded-xl bg-ochre-soft p-1">
           <button
-            disabled={hasAnswered}
             onClick={() => setDirection("target_to_meta")}
             className={`min-h-11 rounded-lg ${direction === "target_to_meta" ? "bg-cream font-bold" : ""}`}
           >
             Igbo → {metaName}
           </button>
           <button
-            disabled={hasAnswered}
             onClick={() => setDirection("meta_to_target")}
             className={`min-h-11 rounded-lg ${direction === "meta_to_target" ? "bg-cream font-bold" : ""}`}
           >

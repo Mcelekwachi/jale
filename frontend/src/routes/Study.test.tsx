@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -101,6 +101,36 @@ describe("Study", () => {
     await userEvent.click(screen.getByRole("button", { name: "Ndewo" }));
     expect(screen.getByText(/correct/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Daalụ" })).toBeDisabled();
+  });
+  it("refetches in both directions when toggled twice around an answer", async () => {
+    setup("quiz", {
+      ...baseItem,
+      prompt: "Hello",
+      options: [
+        { text: "Ndewo", is_correct: true },
+        { text: "Daalụ", is_correct: false },
+      ],
+    });
+    await screen.findByText("Hello");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "English → Igbo" }),
+    );
+    await screen.findByText("Hello");
+    await userEvent.click(screen.getByRole("button", { name: "Ndewo" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Igbo → English" }),
+    );
+
+    await waitFor(() => {
+      const itemRequests = vi
+        .mocked(apiFetch)
+        .mock.calls.filter(([path]) => String(path).includes("/items"))
+        .map(([path]) => String(path));
+      expect(itemRequests).toHaveLength(3);
+      expect(itemRequests[1]).toContain("direction=meta_to_target");
+      expect(itemRequests[2]).toContain("direction=target_to_meta");
+    });
   });
   it("shows missing audio as a disabled control", async () => {
     setup("flashcard");
