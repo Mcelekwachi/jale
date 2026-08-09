@@ -53,6 +53,10 @@ input {
   }
 }
 
+.onboarding-screen {
+  animation: fade 200ms ease-out;
+}
+
 .startup-error {
   max-width: 36rem;
   margin: 4rem auto;

@@ -169,3 +169,10 @@ export interface MetaLanguage {
   translated_count: number;
   total_count: number;
 }
+
+export type CatalogueLanguage = MetaLanguage;
+
+export interface LanguageCatalogue {
+  learnable: CatalogueLanguage[];
+  meta: CatalogueLanguage[];
+}
