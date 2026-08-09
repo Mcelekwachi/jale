@@ -10,4 +10,5 @@ dist/
 worklists/
 frontend/public/audio/
 .worktrees/
+.codex/
 uv.lock
