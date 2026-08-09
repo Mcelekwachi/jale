@@ -230,12 +230,15 @@ describe("onboarding", () => {
     await userEvent.click(
       await screen.findByRole("button", { name: "Right beginner" }),
     );
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     await userEvent.click(
       await screen.findByRole("button", { name: "Right intermediate" }),
     );
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     await userEvent.click(
       await screen.findByRole("button", { name: "Wrong A advanced" }),
     );
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     expect(mockedApiFetch).toHaveBeenCalledWith(
       "/v1/me/preferences",
@@ -250,6 +253,73 @@ describe("onboarding", () => {
     expect(mockedApiFetch).toHaveBeenCalledWith(
       "/v1/me/onboarding/complete",
       expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("treats I'm not sure as neutral and incorrect while revealing the answer", async () => {
+    mockedApiFetch.mockImplementation(async (path) => {
+      if (path === "/v1/me") return profile() as never;
+      if (path.startsWith("/v1/content")) {
+        const difficulty = new URL(`https://test${path}`).searchParams.get(
+          "difficulty",
+        );
+        return {
+          items: [
+            {
+              id: difficulty === "beginner" ? 11 : difficulty === "intermediate" ? 21 : 31,
+              content_type: "word",
+              target_text: `Prompt ${difficulty}`,
+              translation: `Right ${difficulty}`,
+            },
+            {
+              id: 2,
+              content_type: "word",
+              target_text: "a",
+              translation: `Wrong A ${difficulty}`,
+            },
+            {
+              id: 3,
+              content_type: "word",
+              target_text: "b",
+              translation: `Wrong B ${difficulty}`,
+            },
+            {
+              id: 4,
+              content_type: "word",
+              target_text: "c",
+              translation: `Wrong C ${difficulty}`,
+            },
+          ],
+        } as never;
+      }
+      return profile() as never;
+    });
+    renderPath("/onboarding/8");
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "I'm not sure" }),
+    );
+
+    expect(
+      screen.getByRole("button", { name: /I'm not sure.*Your answer.*Not sure/i }),
+    ).toHaveClass("bg-[#eee9df]");
+    expect(
+      screen.getByRole("button", { name: /Right beginner.*Correct answer/i }),
+    ).toHaveTextContent("✓");
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Right intermediate" }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await userEvent.click(screen.getByRole("button", { name: "Right advanced" }));
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(mockedApiFetch).toHaveBeenCalledWith(
+      "/v1/me/preferences",
+      expect.objectContaining({
+        body: expect.stringContaining('"placement_level":"intermediate"'),
+      }),
     );
   });
 

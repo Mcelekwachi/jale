@@ -3,6 +3,7 @@ import { Navigate, useNavigate, useParams } from "react-router-dom";
 
 import { Button } from "../components/Button";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { QuizFeedback } from "../components/QuizFeedback";
 import { Spinner } from "../components/Spinner";
 import { apiFetch } from "../lib/api";
 import type {
@@ -372,24 +373,31 @@ export function Onboarding() {
                     <p className="font-display text-2xl font-semibold text-indigo-deep">
                       {question.item.target_text}
                     </p>
-                    <OptionList
-                      choices={question.options.map((value) => ({
-                        label: value,
-                        value,
-                      }))}
+                    <QuizFeedback
+                      key={questionIndex}
+                      choices={[
+                        ...question.options.map((value) => ({
+                          label: value,
+                          isCorrect: value === question.item.translation,
+                        })),
+                        {
+                          label: "I'm not sure",
+                          isCorrect: false,
+                          isNeutral: true,
+                        },
+                      ]}
                       disabled={busy}
-                      onSelect={(answer) => {
-                        const nextCorrect =
-                          correct +
-                          Number(answer === question.item.translation);
+                      onSelect={(answer) =>
+                        setCorrect((value) => value + Number(answer.isCorrect))
+                      }
+                      onContinue={() => {
                         if (questionIndex < 2) {
-                          setCorrect(nextCorrect);
                           setQuestionIndex((index) => index + 1);
                         } else {
                           const placement_level =
-                            nextCorrect === 3
+                            correct === 3
                               ? "advanced"
-                              : nextCorrect === 2
+                              : correct === 2
                                 ? "intermediate"
                                 : "beginner";
                           void complete({ placement_level });
