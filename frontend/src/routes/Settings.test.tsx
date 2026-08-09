@@ -82,4 +82,30 @@ describe("settings", () => {
       expect.anything(),
     );
   });
+
+  it("uses the shared child option filters", async () => {
+    mockedApiFetch.mockImplementation(async (path) => {
+      if (path === "/v1/languages/meta") return [] as never;
+      return {
+        id: "user-1",
+        preferences: {
+          active_language: "ibo",
+          age_band: "child_u13",
+          connection: null,
+          goal: null,
+          reminder_enabled: false,
+          timezone: "UTC",
+          placement_skipped: false,
+          onboarding_status: "completed",
+          updated_at: "2026-08-02T00:00:00Z",
+        },
+      } as never;
+    });
+    window.history.replaceState({}, "", "/settings");
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
+    expect(screen.queryByText("Teach my children")).not.toBeInTheDocument();
+    expect(screen.queryByText("Igbo parent born abroad")).not.toBeInTheDocument();
+  });
 });

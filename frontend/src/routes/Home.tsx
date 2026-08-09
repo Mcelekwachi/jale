@@ -3,7 +3,13 @@ import { Link } from "react-router-dom";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { Spinner } from "../components/Spinner";
 import { apiFetch } from "../lib/api";
-import type { DueStudyItems, ResolvedTrack, UserStats } from "../lib/types";
+import type {
+  DueStudyItems,
+  MetaLanguage,
+  ResolvedTrack,
+  UserProfile,
+  UserStats,
+} from "../lib/types";
 
 const modeNames = {
   flashcard: "Flashcards",
@@ -17,6 +23,8 @@ export function Home() {
     track: ResolvedTrack;
     stats: UserStats;
     due: DueStudyItems;
+    profile: UserProfile;
+    languages: MetaLanguage[];
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [slow, setSlow] = useState(false);
@@ -30,8 +38,13 @@ export function Home() {
       apiFetch<ResolvedTrack>("/v1/me/track", options),
       apiFetch<UserStats>("/v1/me/stats", options),
       apiFetch<DueStudyItems>("/v1/study/due", options),
+      apiFetch<UserProfile>("/v1/me", options),
+      apiFetch<MetaLanguage[]>("/v1/languages/meta", options),
     ])
-      .then(([track, stats, due]) => active && setData({ track, stats, due }))
+      .then(
+        ([track, stats, due, profile, languages]) =>
+          active && setData({ track, stats, due, profile, languages }),
+      )
       .catch(
         (caught: unknown) =>
           active &&
@@ -56,7 +69,10 @@ export function Home() {
         fullScreen
       />
     );
-  const { track: resolved, stats, due } = data;
+  const { track: resolved, stats, due, profile, languages } = data;
+  const metaCode = profile.preferences.meta_language ?? "eng";
+  const metaName =
+    languages.find(({ code }) => code === metaCode)?.name ?? metaCode;
   return (
     <main className="min-h-dvh bg-warm px-5 py-7 text-ink">
       <div className="mx-auto max-w-2xl space-y-6">
@@ -97,6 +113,9 @@ export function Home() {
           <h2 className="mt-2 font-display text-3xl text-indigo-deep">
             {resolved.track.name}
           </h2>
+          <p className="mt-1 text-sm text-muted">
+            Learning with {metaName}
+          </p>
           <ol className="mt-6 space-y-3">
             {(resolved.track.units ?? []).map((unit) => (
               <li key={unit.position}>

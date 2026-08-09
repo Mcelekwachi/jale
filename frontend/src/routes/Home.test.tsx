@@ -45,7 +45,9 @@ describe("Home", () => {
         current_streak: 3,
         today_goal_met: true,
       } as never)
-      .mockResolvedValueOnce({ items: [{ id: 99 }] } as never);
+      .mockResolvedValueOnce({ items: [{ id: 99 }] } as never)
+      .mockResolvedValueOnce({ preferences: { meta_language: "nld" } } as never)
+      .mockResolvedValueOnce([{ code: "nld", name: "Dutch" }] as never);
 
     render(<Home />, { wrapper: MemoryRouter });
 
@@ -53,6 +55,7 @@ describe("Home", () => {
       await screen.findByRole("link", { name: /settings/i }),
     ).toHaveAttribute("href", "/settings");
     expect(screen.getByText("Foundations")).toBeInTheDocument();
+    expect(screen.getByText(/learning with Dutch/i)).toBeInTheDocument();
     expect(screen.getByText(/3 day streak/i)).toBeInTheDocument();
     expect(screen.getByText(/today's goal met/i)).toBeInTheDocument();
     expect(screen.getByText(/review due/i)).toHaveTextContent("1");
@@ -73,7 +76,9 @@ describe("Home", () => {
         current_streak: 0,
         today_goal_met: false,
       } as never)
-      .mockResolvedValueOnce({ items: [] } as never);
+      .mockResolvedValueOnce({ items: [] } as never)
+      .mockResolvedValueOnce({ preferences: { meta_language: null } } as never)
+      .mockResolvedValueOnce([{ code: "eng", name: "English" }] as never);
     render(<Home />, { wrapper: MemoryRouter });
     expect(
       await screen.findByText(/start your streak today/i),

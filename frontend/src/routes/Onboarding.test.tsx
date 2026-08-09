@@ -15,6 +15,16 @@ vi.mock("./Home", () => ({ Home: () => <p>Home screen</p> }));
 
 const mockedApiFetch = vi.mocked(apiFetch);
 
+const catalogue = {
+  learnable: [
+    { code: "ibo", name: "Igbo", endonym: "Asụsụ Igbo", available: true, content_count: 157 },
+  ],
+  meta: [
+    { code: "eng", name: "English", endonym: "English", available: true, translated_count: 157, total_count: 157 },
+    { code: "nld", name: "Dutch", endonym: "Nederlands", available: true, translated_count: 0, total_count: 157 },
+  ],
+};
+
 const basePreferences = {
   active_language: "ibo",
   meta_language: null,
@@ -52,12 +62,66 @@ describe("onboarding", () => {
   beforeEach(() => {
     mockedApiFetch.mockImplementation(async (path) => {
       if (path === "/v1/me") return profile() as never;
+      if (path === "/v1/languages/catalogue") return catalogue as never;
       return profile() as never;
     });
   });
 
-  it("patches only the screen answer and reached screen before advancing", async () => {
+  it("shows the language catalogue, disabled roadmap entries, and coverage", async () => {
+    mockedApiFetch.mockImplementation(async (path) => {
+      if (path === "/v1/me") return profile() as never;
+      if (path === "/v1/languages/catalogue")
+        return {
+          learnable: [
+            {
+              code: "ibo",
+              name: "Igbo",
+              endonym: "Asụsụ Igbo",
+              available: true,
+              translated_count: 157,
+              total_count: 157,
+            },
+            {
+              code: "yor",
+              name: "Yoruba",
+              endonym: "Èdè Yorùbá",
+              available: false,
+              translated_count: 0,
+              total_count: 0,
+            },
+          ],
+          meta: [
+            {
+              code: "eng",
+              name: "English",
+              endonym: "English",
+              available: true,
+              translated_count: 157,
+              total_count: 157,
+            },
+            {
+              code: "nld",
+              name: "Dutch",
+              endonym: "Nederlands",
+              available: true,
+              translated_count: 0,
+              total_count: 157,
+            },
+          ],
+        } as never;
+      return profile() as never;
+    });
+
     renderPath("/onboarding/2");
+
+    expect(await screen.findByText("Igbo · Asụsụ Igbo")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Èdè Yorùbá.*coming soon/i })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: /Dutch · Nederlands/i }));
+    expect(screen.getByText(/Dutch translations are still being written/i)).toBeInTheDocument();
+  });
+
+  it("patches only the screen answer and reached screen before advancing", async () => {
+    renderPath("/onboarding/3");
     await userEvent.click(
       await screen.findByRole("button", { name: /adult 25\+/i }),
     );
@@ -68,7 +132,7 @@ describe("onboarding", () => {
         method: "PATCH",
         body: JSON.stringify({
           age_band: "adult_25_plus",
-          onboarding_last_screen: 3,
+          onboarding_last_screen: 4,
         }),
       }),
     );
@@ -80,17 +144,17 @@ describe("onboarding", () => {
   it.each([
     [1, "Get started", { onboarding_last_screen: 2 }],
     [
-      3,
+      4,
       "Language enthusiast",
-      { connection: "language_enthusiast", onboarding_last_screen: 4 },
+      { connection: "language_enthusiast", onboarding_last_screen: 5 },
     ],
     [
-      4,
+      5,
       "Visiting Nigeria",
-      { goal: "visiting_nigeria", onboarding_last_screen: 5 },
+      { goal: "visiting_nigeria", onboarding_last_screen: 6 },
     ],
-    [5, "A mix of both", { style: "mixed", onboarding_last_screen: 6 }],
-    [6, "15 minutes", { daily_minutes: 15, onboarding_last_screen: 7 }],
+    [6, "A mix of both", { style: "mixed", onboarding_last_screen: 7 }],
+    [7, "15 minutes", { daily_minutes: 15, onboarding_last_screen: 8 }],
   ])(
     "screen %i writes only its answer and resume marker",
     async (step, label, body) => {
@@ -107,7 +171,7 @@ describe("onboarding", () => {
   );
 
   it("saves reminder fields with the detected timezone", async () => {
-    renderPath("/onboarding/7");
+    renderPath("/onboarding/8");
     await userEvent.click(
       await screen.findByRole("button", { name: /set reminder/i }),
     );
@@ -119,7 +183,7 @@ describe("onboarding", () => {
       reminder_enabled: true,
       reminder_time: "09:00:00",
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-      onboarding_last_screen: 8,
+      onboarding_last_screen: 9,
     });
   });
 
@@ -128,14 +192,14 @@ describe("onboarding", () => {
       if (path === "/v1/me") return profile() as never;
       throw new Error("Save failed");
     });
-    renderPath("/onboarding/4");
+    renderPath("/onboarding/5");
     await userEvent.click(
       await screen.findByRole("button", { name: /visiting nigeria/i }),
     );
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Save failed");
     expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
-    expect(window.location.pathname).toBe("/onboarding/4");
+    expect(window.location.pathname).toBe("/onboarding/5");
   });
 
   it("skips from screen four with its current screen", async () => {
@@ -156,7 +220,7 @@ describe("onboarding", () => {
 
   it("resumes an unfinished user and leaves completed users on home", async () => {
     mockedApiFetch.mockResolvedValueOnce(
-      profile({ onboarding_last_screen: 5 }) as never,
+      profile({ onboarding_last_screen: 6 }) as never,
     );
     const view = renderPath("/");
     expect(
@@ -178,13 +242,97 @@ describe("onboarding", () => {
         return profile({ age_band: "adult_25_plus" }) as never;
       return profile({ age_band: "adult_25_plus" }) as never;
     });
-    renderPath("/onboarding/3");
+    renderPath("/onboarding/4");
     await screen.findByRole("heading", { name: /your connection/i });
     await userEvent.click(screen.getByRole("button", { name: /back/i }));
 
     expect(
       await screen.findByRole("button", { name: /adult 25\+/i }),
     ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("clears an invalid saved goal and explains that it needs revisiting", async () => {
+    mockedApiFetch.mockImplementation(async (path) => {
+      if (path === "/v1/me")
+        return profile({
+          age_band: "adult_25_plus",
+          connection: "language_enthusiast",
+          goal: "teach_my_children",
+        }) as never;
+      return profile() as never;
+    });
+    renderPath("/onboarding/3");
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: /child under 13/i }),
+    );
+
+    expect(mockedApiFetch).toHaveBeenCalledWith(
+      "/v1/me/preferences",
+      expect.objectContaining({
+        body: JSON.stringify({
+          age_band: "child_u13",
+          goal: null,
+          onboarding_last_screen: 5,
+        }),
+      }),
+    );
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      /goal no longer fits.*choose it again/i,
+    );
+    expect(window.location.pathname).toBe("/onboarding/5");
+  });
+
+  it("shows the completion summary and completes only on the primary action", async () => {
+    mockedApiFetch.mockImplementation(async (path) => {
+      if (path === "/v1/me")
+        return profile({
+          meta_language: "nld",
+          connection: "language_enthusiast",
+          goal: "visiting_nigeria",
+          daily_minutes: 15,
+          onboarding_last_screen: 10,
+        }) as never;
+      if (path === "/v1/languages/catalogue") return catalogue as never;
+      return profile() as never;
+    });
+    renderPath("/onboarding/10");
+
+    expect(await screen.findByText("Visiting Nigeria")).toBeInTheDocument();
+    expect(screen.getByText("Igbo with Dutch")).toBeInTheDocument();
+    expect(screen.getByText("15 minutes")).toBeInTheDocument();
+    expect(mockedApiFetch).not.toHaveBeenCalledWith(
+      "/v1/me/onboarding/complete",
+      expect.anything(),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: /start learning/i }),
+    );
+    expect(mockedApiFetch).toHaveBeenCalledWith(
+      "/v1/me/onboarding/complete",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("resumes directly on completion under the new numbering", async () => {
+    mockedApiFetch.mockImplementation(async (path) => {
+      if (path === "/v1/me")
+        return profile({ onboarding_last_screen: 10 }) as never;
+      if (path === "/v1/languages/catalogue") return catalogue as never;
+      return profile() as never;
+    });
+    renderPath("/");
+
+    expect(
+      await screen.findByRole("heading", { name: /ready to begin/i }),
+    ).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/onboarding/10");
+  });
+
+  it("marks screen transitions as disabled for reduced motion", async () => {
+    renderPath("/onboarding/3");
+    const heading = await screen.findByRole("heading", { name: /who are you/i });
+    expect(heading.closest("section")).toHaveClass("motion-reduce:animate-none");
   });
 
   it("scores two placement answers as intermediate", async () => {
@@ -223,9 +371,10 @@ describe("onboarding", () => {
           ],
         } as never;
       }
+      if (path === "/v1/languages/catalogue") return catalogue as never;
       return profile() as never;
     });
-    renderPath("/onboarding/8");
+    renderPath("/onboarding/9");
 
     await userEvent.click(
       await screen.findByRole("button", { name: "Right beginner" }),
@@ -246,11 +395,11 @@ describe("onboarding", () => {
         method: "PATCH",
         body: JSON.stringify({
           placement_level: "intermediate",
-          onboarding_last_screen: 8,
+          onboarding_last_screen: 10,
         }),
       }),
     );
-    expect(mockedApiFetch).toHaveBeenCalledWith(
+    expect(mockedApiFetch).not.toHaveBeenCalledWith(
       "/v1/me/onboarding/complete",
       expect.objectContaining({ method: "POST" }),
     );
@@ -292,9 +441,10 @@ describe("onboarding", () => {
           ],
         } as never;
       }
+      if (path === "/v1/languages/catalogue") return catalogue as never;
       return profile() as never;
     });
-    renderPath("/onboarding/8");
+    renderPath("/onboarding/9");
 
     await userEvent.click(
       await screen.findByRole("button", { name: "I'm not sure" }),
@@ -327,9 +477,10 @@ describe("onboarding", () => {
     mockedApiFetch.mockImplementation(async (path) => {
       if (path === "/v1/me") return profile() as never;
       if (path.startsWith("/v1/content")) return { items: [] } as never;
+      if (path === "/v1/languages/catalogue") return catalogue as never;
       return profile() as never;
     });
-    renderPath("/onboarding/8");
+    renderPath("/onboarding/9");
     await userEvent.click(
       await screen.findByRole("button", { name: /skip this/i }),
     );
@@ -338,9 +489,6 @@ describe("onboarding", () => {
       "/v1/me/preferences",
       expect.objectContaining({ body: expect.stringContaining("placement") }),
     );
-    expect(mockedApiFetch).toHaveBeenCalledWith(
-      "/v1/me/onboarding/complete",
-      expect.objectContaining({ method: "POST" }),
-    );
+    expect(window.location.pathname).toBe("/onboarding/10");
   });
 });

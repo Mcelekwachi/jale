@@ -7,6 +7,7 @@ import { apiFetch } from "../lib/api";
 import { defaultMetaLanguage } from "../lib/locale";
 import type {
   MetaLanguage,
+  ResolvedTrack,
   StudyDirection,
   StudyItem,
   StudySession,
@@ -25,6 +26,7 @@ export function Study() {
   const [session, setSession] = useState<StudySession | null>(null);
   const [meta, setMeta] = useState<string>(defaultMetaLanguage());
   const [metaName, setMetaName] = useState("English");
+  const [trackName, setTrackName] = useState("");
   const [direction, setDirection] = useState<StudyDirection>("target_to_meta");
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
@@ -55,8 +57,9 @@ export function Study() {
     void Promise.all([
       apiFetch<UserProfile>("/v1/me", { authenticated: true }),
       apiFetch<MetaLanguage[]>("/v1/languages/meta"),
+      apiFetch<ResolvedTrack>("/v1/me/track", { authenticated: true }),
     ])
-      .then(async ([profile, languages]) => {
+      .then(async ([profile, languages, resolvedTrack]) => {
         const code = profile.preferences.meta_language ?? defaultMetaLanguage();
         const params = new URLSearchParams({ meta_language: code, direction });
         const next = await apiFetch<StudySession>(
@@ -66,6 +69,7 @@ export function Study() {
         if (active) {
           setMeta(code);
           setMetaName(languages.find((l) => l.code === code)?.name ?? code);
+          setTrackName(resolvedTrack.track.name);
           setSession(next);
           setShownAt(Date.now());
         }
@@ -203,10 +207,11 @@ export function Study() {
           <Link to="/" className="inline-flex min-h-11 items-center">
             ← Home
           </Link>
-          <span>
-            {index + 1} of {session.items.length}
-          </span>
+          <span>Item {index + 1} of {session.items.length}</span>
         </header>
+        <p className="text-xs font-bold uppercase tracking-[.18em] text-terracotta">
+          {trackName} · {session.unit_title}
+        </p>
         {queueError && (
           <div className="my-3 rounded-xl bg-terracotta-soft p-3 text-sm">
             Answers are still safe in this session.{" "}
