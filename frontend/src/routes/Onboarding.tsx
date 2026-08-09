@@ -102,7 +102,7 @@ export function Onboarding() {
   }, []);
 
   useEffect(() => {
-    if (step !== 2 || catalogue) return;
+    if ((step !== 2 && step !== 10) || catalogue) return;
     let active = true;
     void apiFetch<LanguageCatalogue>("/v1/languages/catalogue", {
       onSlowChange: (value) => active && setSlow(value),

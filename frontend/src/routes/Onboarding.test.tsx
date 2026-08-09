@@ -293,11 +293,13 @@ describe("onboarding", () => {
           daily_minutes: 15,
           onboarding_last_screen: 10,
         }) as never;
+      if (path === "/v1/languages/catalogue") return catalogue as never;
       return profile() as never;
     });
     renderPath("/onboarding/10");
 
     expect(await screen.findByText("Visiting Nigeria")).toBeInTheDocument();
+    expect(screen.getByText("Igbo with Dutch")).toBeInTheDocument();
     expect(screen.getByText("15 minutes")).toBeInTheDocument();
     expect(mockedApiFetch).not.toHaveBeenCalledWith(
       "/v1/me/onboarding/complete",
@@ -310,6 +312,27 @@ describe("onboarding", () => {
       "/v1/me/onboarding/complete",
       expect.objectContaining({ method: "POST" }),
     );
+  });
+
+  it("resumes directly on completion under the new numbering", async () => {
+    mockedApiFetch.mockImplementation(async (path) => {
+      if (path === "/v1/me")
+        return profile({ onboarding_last_screen: 10 }) as never;
+      if (path === "/v1/languages/catalogue") return catalogue as never;
+      return profile() as never;
+    });
+    renderPath("/");
+
+    expect(
+      await screen.findByRole("heading", { name: /ready to begin/i }),
+    ).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/onboarding/10");
+  });
+
+  it("marks screen transitions as disabled for reduced motion", async () => {
+    renderPath("/onboarding/3");
+    const heading = await screen.findByRole("heading", { name: /who are you/i });
+    expect(heading.closest("section")).toHaveClass("motion-reduce:animate-none");
   });
 
   it("scores two placement answers as intermediate", async () => {
@@ -348,6 +371,7 @@ describe("onboarding", () => {
           ],
         } as never;
       }
+      if (path === "/v1/languages/catalogue") return catalogue as never;
       return profile() as never;
     });
     renderPath("/onboarding/9");
@@ -417,6 +441,7 @@ describe("onboarding", () => {
           ],
         } as never;
       }
+      if (path === "/v1/languages/catalogue") return catalogue as never;
       return profile() as never;
     });
     renderPath("/onboarding/9");
@@ -452,6 +477,7 @@ describe("onboarding", () => {
     mockedApiFetch.mockImplementation(async (path) => {
       if (path === "/v1/me") return profile() as never;
       if (path.startsWith("/v1/content")) return { items: [] } as never;
+      if (path === "/v1/languages/catalogue") return catalogue as never;
       return profile() as never;
     });
     renderPath("/onboarding/9");
