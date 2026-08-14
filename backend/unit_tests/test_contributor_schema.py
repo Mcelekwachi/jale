@@ -63,3 +63,24 @@ def test_registry_defaults_required_validators_to_one():
     assert errors == []
     assert registry
     assert all(language["required_validators"] == 1 for language in registry)
+
+
+def test_language_upsert_binds_required_validator_threshold():
+    class Cursor:
+        def execute(self, _query, params):
+            self.params = params
+
+        def fetchone(self):
+            return {"id": 1}
+
+    cursor = Cursor()
+    seed.upsert_language(
+        cursor,
+        {
+            "code": "ibo",
+            "name": "Igbo",
+            "required_validators": 3,
+        },
+    )
+
+    assert cursor.params["required_validators"] == 3

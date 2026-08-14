@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
 import uuid
+from pathlib import Path
 
 import psycopg
 import pytest
 from db_test_utils import db_connection
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def create_user_and_contributor(database_url: str) -> tuple[uuid.UUID, int]:
@@ -216,3 +222,37 @@ def test_required_validators_defaults_and_seeds(database_url):
             )
         finally:
             conn.execute("DELETE FROM languages WHERE id = %s", (row[0],))
+
+
+def test_seeding_twice_preserves_registry_and_row_counts(database_url):
+    command = [sys.executable, str(REPO_ROOT / "db" / "seed" / "seed.py"), "--all"]
+    env = {**os.environ, "DATABASE_URL": database_url}
+
+    first = subprocess.run(command, cwd=REPO_ROOT, env=env, capture_output=True, text=True)
+    assert first.returncode == 0, first.stdout + first.stderr
+    with db_connection(database_url) as conn:
+        registry_after_first = conn.execute(
+            "SELECT code, name, is_active, is_learnable, is_meta, required_validators, "
+            "sort_order FROM languages ORDER BY code"
+        ).fetchall()
+        counts_after_first = conn.execute(
+            "SELECT (SELECT count(*) FROM languages), (SELECT count(*) FROM categories), "
+            "(SELECT count(*) FROM content_items), "
+            "(SELECT count(*) FROM content_translations), (SELECT count(*) FROM tracks)"
+        ).fetchone()
+
+    second = subprocess.run(command, cwd=REPO_ROOT, env=env, capture_output=True, text=True)
+    assert second.returncode == 0, second.stdout + second.stderr
+    with db_connection(database_url) as conn:
+        registry_after_second = conn.execute(
+            "SELECT code, name, is_active, is_learnable, is_meta, required_validators, "
+            "sort_order FROM languages ORDER BY code"
+        ).fetchall()
+        counts_after_second = conn.execute(
+            "SELECT (SELECT count(*) FROM languages), (SELECT count(*) FROM categories), "
+            "(SELECT count(*) FROM content_items), "
+            "(SELECT count(*) FROM content_translations), (SELECT count(*) FROM tracks)"
+        ).fetchone()
+
+    assert registry_after_second == registry_after_first
+    assert counts_after_second == counts_after_first

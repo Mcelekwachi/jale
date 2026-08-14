@@ -140,6 +140,7 @@ def upsert_language(cur, lang):
             "is_active": lang.get("is_active", False),
             "is_learnable": lang.get("is_learnable", False),
             "is_meta": lang.get("is_meta", False),
+            "required_validators": lang.get("required_validators", 1),
             "sort_order": lang.get("sort_order", 100),
         },
     )
