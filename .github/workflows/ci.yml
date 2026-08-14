@@ -38,6 +38,27 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install ruff==0.8.4
+      - name: Enforce the Igbo language name
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          pattern='\b(?:I[bB][oO]|iB[oO]|ibO)\b'
+          matches="$({
+            grep -RInIP \
+              --exclude-dir='node_modules' \
+              --exclude-dir='dist' \
+              --exclude-dir='.git' \
+              --exclude-dir='.venv' \
+              --exclude-dir='*pycache*' \
+              -- "$pattern" . || true
+          } | grep -vE '^\./\.github/workflows/ci\.yml:' \
+            | grep -v 'igbo-naming-check:ignore' || true)"
+          if [[ -n "$matches" ]]; then
+            printf '%s\n' "$matches"
+            echo '::error::Use “Igbo” for the language name; lowercase “ibo” is the ISO 639-3 code. Offending file and line are listed above.'
+            exit 1
+          fi
+          echo 'Igbo naming check passed.'
       - run: ruff check backend db
       - run: ruff format --check backend db
 
