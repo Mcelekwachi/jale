@@ -51,7 +51,7 @@ def test_schema_declares_contributor_tables_and_threshold():
         "validator_assignments",
         "earnings_ledger",
     ):
-        assert f"CREATE TABLE {table}" in SCHEMA
+        assert re.search(rf"CREATE TABLE(?: IF NOT EXISTS)? {table}\b", SCHEMA)
     assert "required_validators SMALLINT NOT NULL DEFAULT 1" in SCHEMA
     assert "english_translation" not in SCHEMA
 
