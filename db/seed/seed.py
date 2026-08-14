@@ -117,9 +117,10 @@ def upsert_language(cur, lang):
     cur.execute(
         """
         INSERT INTO languages (code, name, endonym, flag_emoji, is_active,
-                               is_learnable, is_meta, sort_order)
+                               is_learnable, is_meta, required_validators, sort_order)
         VALUES (%(code)s, %(name)s, %(endonym)s, %(flag_emoji)s,
-                %(is_active)s, %(is_learnable)s, %(is_meta)s, %(sort_order)s)
+                %(is_active)s, %(is_learnable)s, %(is_meta)s,
+                %(required_validators)s, %(sort_order)s)
         ON CONFLICT (code) DO UPDATE SET
             name       = COALESCE(NULLIF(EXCLUDED.name, ''), languages.name),
             endonym    = COALESCE(NULLIF(EXCLUDED.endonym, ''), languages.endonym),
@@ -127,6 +128,7 @@ def upsert_language(cur, lang):
             is_active  = EXCLUDED.is_active,
             is_learnable = EXCLUDED.is_learnable,
             is_meta      = EXCLUDED.is_meta,
+            required_validators = EXCLUDED.required_validators,
             sort_order = EXCLUDED.sort_order
         RETURNING id
         """,
@@ -440,6 +442,7 @@ def load_language_registry(errors):
         if not isinstance(lang, dict):
             errors.append(f"{loc}: language entry must be a mapping")
             continue
+        lang.setdefault("required_validators", 1)
         for field in (
             "code",
             "name",
@@ -465,6 +468,9 @@ def load_language_registry(errors):
             file_codes[file_code] = code
         if not lang.get("is_meta", False) and not lang.get("is_learnable", False):
             errors.append(f"{loc}: language must be learnable, meta, or both")
+        threshold = lang.get("required_validators")
+        if not isinstance(threshold, int) or isinstance(threshold, bool) or threshold < 1:
+            errors.append(f"{loc}: required_validators must be a positive integer")
     return languages, file_codes
 
 
