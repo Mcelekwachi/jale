@@ -11,6 +11,45 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  schema-idempotency:
+    name: Schema idempotency
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: jale
+          POSTGRES_PASSWORD: jale
+          POSTGRES_DB: jale_fresh
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U jale"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      FRESH_DATABASE_URL: postgresql://jale:jale@localhost:5432/jale_fresh
+      HISTORICAL_DATABASE_URL: postgresql://jale:jale@localhost:5432/jale_historical
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r db/seed/requirements.txt
+      - name: Create historical-upgrade database
+        shell: bash
+        run: |
+          python -c "import psycopg; connection = psycopg.connect('postgresql://jale:jale@localhost:5432/postgres', autocommit=True); connection.execute('CREATE DATABASE jale_historical'); connection.close()"
+          git show 8b406de:db/schema.sql > "$RUNNER_TEMP/schema-8b406de.sql"
+      - name: Apply and seed a fresh schema twice
+        run: python scripts/verify_schema_idempotency.py fresh --database-url "$FRESH_DATABASE_URL"
+      - name: Upgrade the historical production schema
+        run: python scripts/verify_schema_idempotency.py historical --database-url "$HISTORICAL_DATABASE_URL" --schema "$RUNNER_TEMP/schema-8b406de.sql"
+
   # Content validation needs no database, so it fails in seconds on a bad CSV
   # rather than after a full Postgres spin-up.
   content:

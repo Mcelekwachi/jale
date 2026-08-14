@@ -6,6 +6,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCHEMA = (REPO_ROOT / "db" / "schema.sql").read_text(encoding="utf-8")
 ENTRYPOINT = (REPO_ROOT / "scripts" / "entrypoint.sh").read_text(encoding="utf-8")
+CI = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+ARCHITECTURE = (REPO_ROOT / "ARCHITECTURE.md").read_text(encoding="utf-8")
 
 
 def test_schema_create_statements_are_rerunnable():
@@ -45,3 +47,19 @@ def test_entrypoint_always_applies_schema_and_propagates_failure():
     assert "entrypoint: applying db/schema.sql (idempotent)" in ENTRYPOINT
     assert "conn.execute(fh.read())" in ENTRYPOINT
     assert "set -euo pipefail" in ENTRYPOINT
+
+
+def test_ci_checks_fresh_and_historical_schema_application():
+    assert "schema-idempotency:" in CI
+    assert "timeout-minutes: 10" in CI
+    assert "git show 8b406de:db/schema.sql" in CI
+    assert "python scripts/verify_schema_idempotency.py" in CI
+    assert (REPO_ROOT / "scripts" / "verify_schema_idempotency.py").is_file()
+
+
+def test_architecture_documents_rerunnable_schema_limits():
+    section = ARCHITECTURE.split("## Rerunnable schema deployments", maxsplit=1)[1]
+    assert "every deploy" in section
+    assert "column renames" in section
+    assert "data backfills" in section
+    assert "Alembic" in section
