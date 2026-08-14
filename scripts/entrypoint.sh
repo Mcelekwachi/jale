@@ -44,15 +44,9 @@ with conn:
     conn.execute("SELECT pg_advisory_lock(%s)", (LOCK_ID,))
     try:
         if os.environ.get("RUN_MIGRATIONS") == "true":
-            exists = conn.execute(
-                "SELECT to_regclass('public.content_items') IS NOT NULL"
-            ).fetchone()[0]
-            if exists:
-                print("entrypoint: schema already present, skipping")
-            else:
-                print("entrypoint: applying db/schema.sql")
-                with open("db/schema.sql", encoding="utf-8") as fh:
-                    conn.execute(fh.read())
+            print("entrypoint: applying db/schema.sql (idempotent)")
+            with open("db/schema.sql", encoding="utf-8") as fh:
+                conn.execute(fh.read())
     finally:
         conn.execute("SELECT pg_advisory_unlock(%s)", (LOCK_ID,))
 PY

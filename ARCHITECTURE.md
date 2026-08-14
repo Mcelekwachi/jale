@@ -201,3 +201,18 @@ language. Their existing trigger remains the sole owner of `flag_count`, with
 mutations serialized on the content row. Public share profiles use a separate
 six-field projection and never expose user IDs, email, preferences, progress,
 flags, or exact timestamps.
+
+---
+
+## Rerunnable schema deployments
+
+When migrations are enabled, the container entrypoint applies `db/schema.sql`
+on every deploy while holding the existing PostgreSQL advisory lock. The file
+is safe to apply repeatedly: object creation, columns, constraints, triggers,
+views, and enum additions are all guarded or deliberately replaced. CI proves
+this both by applying and seeding a fresh database twice and by upgrading the
+historical production schema snapshot.
+
+This lightweight approach cannot safely express changes such as column renames
+or data backfills. Introduce a versioned migration tool such as Alembic before
+either becomes necessary.
