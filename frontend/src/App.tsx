@@ -6,6 +6,7 @@ import { OnboardingGuard } from "./auth/OnboardingGuard";
 import { AuthCallback } from "./routes/AuthCallback";
 import { Home } from "./routes/Home";
 import { Onboarding } from "./routes/Onboarding";
+import { AdminErrorBoundary, AdminRoute } from "./routes/Admin";
 import { Settings } from "./routes/Settings";
 import { SignIn } from "./routes/SignIn";
 import { Study } from "./routes/Study";
@@ -18,6 +19,14 @@ export function App() {
           <Route path="/signin" element={<SignIn />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route element={<ProtectedRoute />}>
+            <Route
+              path="/admin"
+              element={
+                <AdminErrorBoundary>
+                  <AdminRoute />
+                </AdminErrorBoundary>
+              }
+            />
             <Route path="/onboarding" element={<Onboarding />} />
             <Route path="/onboarding/:step" element={<Onboarding />} />
             <Route element={<OnboardingGuard />}>
