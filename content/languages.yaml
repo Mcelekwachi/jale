@@ -6,6 +6,7 @@ languages:
     is_learnable: true
     is_meta: false
     is_active: true
+    required_validators: 1
     sort_order: 10
 
   - code: eng

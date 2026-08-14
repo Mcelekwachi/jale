@@ -27,7 +27,22 @@ CREATE TYPE difficulty_level AS ENUM ('beginner', 'intermediate', 'advanced', 'n
 CREATE TYPE content_status  AS ENUM ('draft', 'published', 'hidden');
 CREATE TYPE audio_status    AS ENUM ('missing', 'placeholder', 'verified');
 
-CREATE TYPE user_role       AS ENUM ('learner', 'contributor', 'admin');
+CREATE TYPE user_role       AS ENUM ('learner', 'contributor', 'validator', 'admin');
+
+CREATE TYPE contributor_status AS ENUM ('active', 'paused', 'suspended');
+CREATE TYPE contributor_level AS ENUM ('learner', 'speaker', 'keeper', 'elder');
+CREATE TYPE validator_status AS ENUM (
+  'not_applicable', 'pending_verification', 'verified', 'suspended'
+);
+CREATE TYPE validator_level AS ENUM ('standard', 'senior');
+CREATE TYPE payment_provider AS ENUM ('paystack', 'wise');
+CREATE TYPE submission_status AS ENUM ('pending', 'in_review', 'accepted', 'rejected');
+CREATE TYPE validator_decision AS ENUM ('approve', 'reject');
+CREATE TYPE earnings_role AS ENUM ('contributor', 'validator');
+CREATE TYPE earnings_status AS ENUM ('pending', 'paid', 'failed');
+CREATE TYPE submission_kind AS ENUM (
+  'new_content', 'correction', 'dialect_variant', 'audio'
+);
 
 CREATE TYPE age_band        AS ENUM ('child_u13', 'young_adult_13_25', 'adult_25_plus');
 CREATE TYPE connection_type AS ENUM (
@@ -68,6 +83,8 @@ CREATE TABLE languages (
   is_active     BOOLEAN NOT NULL DEFAULT FALSE,-- available for use in the app
   is_learnable  BOOLEAN NOT NULL DEFAULT FALSE,
   is_meta       BOOLEAN NOT NULL DEFAULT FALSE,
+  -- Founder-only Phase 1 uses 1; raise to 3 per language after validators are recruited.
+  required_validators SMALLINT NOT NULL DEFAULT 1,
   sort_order    SMALLINT NOT NULL DEFAULT 100,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -201,6 +218,119 @@ CREATE TABLE contributor_permissions (
   granted_by    UUID REFERENCES app_users(id),
   granted_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (user_id, language_id)
+);
+
+-- Contributor identity, trust and payout-recipient metadata. Payment providers
+-- retain all bank/payment credentials; only their recipient token is stored.
+CREATE TABLE contributors (
+  id                           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id                      UUID NOT NULL UNIQUE REFERENCES app_users(id) ON DELETE CASCADE,
+  display_name                 TEXT NOT NULL,
+  location                     TEXT,
+  payment_provider             payment_provider,
+  payment_recipient_token      TEXT,
+  payment_last_four            TEXT,
+  payment_currency             CHAR(3),
+  contributor_level            contributor_level NOT NULL DEFAULT 'learner',
+  total_earnings_cents         BIGINT NOT NULL DEFAULT 0,
+  total_accepted_batches       INTEGER NOT NULL DEFAULT 0,
+  total_rejected_batches       INTEGER NOT NULL DEFAULT 0,
+  consecutive_rejected_batches INTEGER NOT NULL DEFAULT 0,
+  validator_status             validator_status NOT NULL DEFAULT 'not_applicable',
+  validator_level              validator_level,
+  validator_verified_at        TIMESTAMPTZ,
+  validator_verified_by        UUID REFERENCES app_users(id),
+  validator_verification_note  TEXT,
+  status                       contributor_status NOT NULL DEFAULT 'active',
+  status_reason                TEXT,
+  -- Consent is separate, explicit and revocable; elder status never publishes identity.
+  public_listing_consent       BOOLEAN NOT NULL DEFAULT FALSE,
+  joined_at                    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at                   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT contributor_validator_level_verified CHECK (
+    validator_status = 'verified' OR validator_level IS NULL
+  ),
+  CONSTRAINT contributor_validator_verification_pair CHECK (
+    (validator_verified_at IS NULL AND validator_verified_by IS NULL)
+    OR (
+      validator_status = 'verified'
+      AND validator_verified_at IS NOT NULL
+      AND validator_verified_by IS NOT NULL
+    )
+  )
+);
+
+CREATE TABLE content_submissions (
+  id                       BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  contributor_id           BIGINT NOT NULL REFERENCES contributors(id),
+  language_id              SMALLINT NOT NULL REFERENCES languages(id),
+  dialect_id               SMALLINT REFERENCES dialects(id),
+  category_id              SMALLINT REFERENCES categories(id),
+  submission_kind          submission_kind NOT NULL,
+  content_type             content_type NOT NULL,
+  difficulty_level         difficulty_level,
+  target_text              TEXT NOT NULL,
+  target_text_toned        TEXT,
+  meta_language_id         SMALLINT REFERENCES languages(id),
+  translation              TEXT,
+  literal_translation      TEXT,
+  cultural_note            TEXT,
+  example_sentence         TEXT,
+  audio_url                TEXT,
+  corrects_content_id      BIGINT REFERENCES content_items(id),
+  batch_id                 UUID,
+  status                   submission_status NOT NULL DEFAULT 'pending',
+  rejection_reason         TEXT,
+  duplicate_of_content_id  BIGINT REFERENCES content_items(id),
+  published_content_id     BIGINT REFERENCES content_items(id),
+  submitted_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
+  decided_at               TIMESTAMPTZ,
+  paid_at                  TIMESTAMPTZ,
+  payment_amount_cents     INTEGER,
+  CONSTRAINT submission_correction_target CHECK (
+    (submission_kind IN ('correction', 'dialect_variant') AND corrects_content_id IS NOT NULL)
+    OR (submission_kind = 'new_content' AND corrects_content_id IS NULL)
+    OR submission_kind = 'audio'
+  )
+);
+CREATE INDEX content_submissions_contributor_status_idx
+  ON content_submissions (contributor_id, status);
+CREATE INDEX content_submissions_status_submitted_idx
+  ON content_submissions (status, submitted_at);
+CREATE INDEX content_submissions_batch_idx ON content_submissions (batch_id);
+
+CREATE TABLE validator_assignments (
+  id                 BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  submission_id      BIGINT NOT NULL REFERENCES content_submissions(id) ON DELETE CASCADE,
+  validator_id       BIGINT NOT NULL REFERENCES contributors(id),
+  decision           validator_decision,
+  correction_note    TEXT,
+  counts_for_payment BOOLEAN NOT NULL DEFAULT TRUE,
+  assigned_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  decided_at         TIMESTAMPTZ,
+  UNIQUE (submission_id, validator_id),
+  CONSTRAINT validator_assignment_decision_time CHECK (
+    (decision IS NULL) = (decided_at IS NULL)
+  )
+);
+
+CREATE TABLE earnings_ledger (
+  id                  BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  contributor_id      BIGINT NOT NULL REFERENCES contributors(id),
+  role                earnings_role NOT NULL,
+  batch_reference     TEXT NOT NULL UNIQUE,
+  item_count          INTEGER NOT NULL,
+  rate_description    TEXT NOT NULL,
+  amount_eur_cents    INTEGER NOT NULL,
+  payout_currency     CHAR(3),
+  payout_amount_minor BIGINT,
+  exchange_rate       NUMERIC(18,8),
+  payment_provider    payment_provider,
+  payment_reference   TEXT,
+  status              earnings_status NOT NULL DEFAULT 'pending',
+  failure_reason      TEXT,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  paid_at             TIMESTAMPTZ
 );
 
 -- ---------------------------------------------------------------------
@@ -379,6 +509,8 @@ CREATE TRIGGER content_translations_touch BEFORE UPDATE ON content_translations
   FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 CREATE TRIGGER user_preferences_touch BEFORE UPDATE ON user_preferences
   FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+CREATE TRIGGER contributors_touch BEFORE UPDATE ON contributors
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 
 -- The seeded English/default proverb translation must carry its cultural lesson;
 -- other meta languages may fall back to that lesson independently.
@@ -409,6 +541,22 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER content_translations_require_proverb_note
   BEFORE INSERT OR UPDATE ON content_translations
   FOR EACH ROW EXECUTE FUNCTION require_proverb_translation_cultural_note();
+
+CREATE OR REPLACE FUNCTION require_submission_proverb_cultural_note()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.content_type = 'proverb'
+     AND NEW.translation IS NOT NULL
+     AND NEW.cultural_note IS NULL THEN
+    RAISE EXCEPTION 'cultural_note is required for translated proverb submissions';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER content_submissions_require_proverb_note
+  BEFORE INSERT OR UPDATE ON content_submissions
+  FOR EACH ROW EXECUTE FUNCTION require_submission_proverb_cultural_note();
 
 -- keep content_items.flag_count in sync with open flags
 CREATE OR REPLACE FUNCTION sync_flag_count() RETURNS TRIGGER AS $$
