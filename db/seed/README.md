@@ -9,6 +9,29 @@ python db/seed/seed.py --language ibo       # idempotent, run on every deploy
 python db/seed/placeholder_audio.py -l ibo --engine silence
 ```
 
+## Importing recorded audio
+
+Recording filenames are the content item's `source_key` with colons replaced
+by underscores, followed by the file extension. For example,
+`ibo:word:ndewo` becomes `ibo_word_ndewo.mp3`.
+
+Before recording, export the missing-recording worklist:
+
+```bash
+python db/seed/import_audio.py --language ibo --dry-run --export-worklist worklists/ibo_audio.csv
+```
+
+Save each recording under the exact filename in the worklist. In the Supabase
+dashboard, open the public `audio` Storage bucket and drag the files into the
+`Igbo` folder. Storage paths are case-sensitive: the folder is `Igbo` with a
+capital `I`.
+
+After uploading, attach every recording found in the public bucket:
+
+```bash
+python db/seed/import_audio.py --language ibo
+```
+
 ## Contributor round trip
 
 ```bash
