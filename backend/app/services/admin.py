@@ -257,7 +257,7 @@ async def get_content_detail(content_id: int) -> dict:
                         ON translation.meta_language_id=meta_language.id
                        AND translation.content_id=%s
                       LEFT JOIN app_users verifier ON verifier.id=translation.verified_by
-                     WHERE meta_language.is_meta
+                     WHERE meta_language.is_meta AND meta_language.is_active
                      ORDER BY meta_language.code""",
                 (content_id,),
             )

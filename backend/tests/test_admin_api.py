@@ -159,6 +159,8 @@ async def test_flag_queue_resolution_and_bulk_resolution(client, database_url, a
             json={"status": "resolved", "resolution_note": "checked"},
         )
         assert first.status_code == 200
+        assert "meta_language" in first.json()
+        assert "meta_language_id" not in first.json()
         assert (
             await client.patch(
                 f"/v1/admin/flags/{rows[0][0]}",
@@ -242,6 +244,15 @@ async def test_content_edits_are_audited_and_proverb_validation_is_readable(
                 json={"target_text": changed, "change_note": "test edit"},
             )
             assert response.status_code == 200
+            assert response.json()["language"] == "ibo"
+            assert (
+                not {
+                    "language_id",
+                    "dialect_id",
+                    "category_id",
+                }
+                & response.json().keys()
+            )
             assert (
                 await client.patch(
                     f"/v1/admin/content/{content_id}",
@@ -294,6 +305,15 @@ async def test_translation_verification_contributors_and_user_search(
             assert verified.json()["content"] is None
             assert verified.json()["translation"]["verified_by"] == str(admin_id)
             assert verified.json()["translation"]["meta_language"] == "eng"
+            item_verified = await client.post(
+                f"/v1/admin/content/{content_id}/verify",
+                headers=admin_headers,
+                json={"meta_language": None},
+            )
+            assert item_verified.status_code == 200
+            assert item_verified.json()["target"] == "content"
+            assert item_verified.json()["translation"] is None
+            assert item_verified.json()["content"]["language"] == "ibo"
             granted = await client.post(
                 "/v1/admin/contributors",
                 headers=admin_headers,
@@ -444,6 +464,21 @@ async def test_admin_content_detail_distinguishes_missing_and_empty_translations
     with isolated_test_users(admin_id):
         try:
             with db_connection(database_url) as conn:
+                language_id = conn.execute("SELECT id FROM languages WHERE code='ibo'").fetchone()[
+                    0
+                ]
+                category_id, category_slug = conn.execute(
+                    "SELECT id, slug FROM categories WHERE language_id=%s ORDER BY id LIMIT 1",
+                    (language_id,),
+                ).fetchone()
+                dialect_id, dialect_code = conn.execute(
+                    "SELECT id, code FROM dialects WHERE language_id=%s ORDER BY id LIMIT 1",
+                    (language_id,),
+                ).fetchone()
+                conn.execute(
+                    "UPDATE content_items SET category_id=%s, dialect_id=%s WHERE id=%s",
+                    (category_id, dialect_id, content_id),
+                )
                 english_id = conn.execute("SELECT id FROM languages WHERE code='eng'").fetchone()[0]
                 conn.execute(
                     "INSERT INTO content_translations "
@@ -456,6 +491,8 @@ async def test_admin_content_detail_distinguishes_missing_and_empty_translations
             assert response.status_code == 200
             detail = response.json()
             assert detail["item"]["language"] == "ibo"
+            assert detail["item"]["category"] == category_slug
+            assert detail["item"]["dialect"] == dialect_code
             assert (
                 not {
                     "language_id",
