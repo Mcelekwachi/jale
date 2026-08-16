@@ -6,6 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.admin_schemas import (
+    AdminContentDetail,
     AdminContentPage,
     AdminContentPatch,
     AdminContentRevision,
@@ -73,6 +74,7 @@ async def admin_content(
     verified: bool | None = None,
     audio_state: Literal["missing", "placeholder", "verified"] | None = None,
     has_flags: bool | None = None,
+    missing_translation: str | None = None,
     limit: int = Query(default=50, ge=1),
     offset: int = Query(default=0, ge=0),
 ) -> dict:
@@ -85,9 +87,15 @@ async def admin_content(
         verified=verified,
         audio_state=audio_state,
         has_flags=has_flags,
+        missing_translation=missing_translation,
         limit=min(limit, get_settings().max_page_size),
         offset=offset,
     )
+
+
+@router.get("/content/{content_id}", response_model=AdminContentDetail)
+async def content_detail(content_id: int) -> dict:
+    return await admin.get_content_detail(content_id)
 
 
 @router.patch("/content/{content_id}", response_model=AdminContentState)
