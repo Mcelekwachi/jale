@@ -147,6 +147,16 @@ def test_verified_recording_is_not_downgraded_to_placeholder():
     assert result.unexpected_urls == [("ibo:word:ndewo", existing)]
 
 
+def test_placeholder_import_fills_verified_item_without_downgrading_state():
+    row = {**ITEMS[0], "audio_url": None, "audio_state": "verified"}
+    conn = FakeConnection([row])
+
+    import_audio.run_import(conn, options(audio_state="placeholder"), head_exists=lambda _url: True)
+
+    expected = import_audio.public_url(options(), "ibo:word:ndewo")
+    assert conn.updates == [(expected, "verified", 1)]
+
+
 def test_unexpected_existing_url_is_reported_when_expected_recording_is_missing():
     existing = "https://recordings.example/other.mp3"
     row = {**ITEMS[0], "audio_url": existing, "audio_state": "placeholder"}

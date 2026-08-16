@@ -139,16 +139,14 @@ def run_import(conn, options: ImportOptions, *, head_exists=head_exists) -> Impo
         if existing_url and existing_url != expected_url:
             continue
 
-        would_downgrade = existing_state == "verified" and options.audio_state == "placeholder"
-        if existing_url == expected_url and (
-            existing_state == options.audio_state or would_downgrade
-        ):
+        new_state = "verified" if existing_state == "verified" else options.audio_state
+        if existing_url == expected_url and existing_state == new_state:
             result.already_linked += 1
             continue
 
         result.newly_linked += 1
         result.changes.append(row["source_key"])
-        updates.append((expected_url, options.audio_state, row["id"]))
+        updates.append((expected_url, new_state, row["id"]))
 
     if options.export_worklist:
         write_worklist(options.export_worklist, missing_rows, options)
