@@ -47,4 +47,18 @@ describe("AudioButton", () => {
       screen.getByRole("button", { name: /audio coming soon/i }),
     ).toBeDisabled();
   });
+
+  it("plays the current URL after the URL changes", async () => {
+    const play = vi.fn().mockResolvedValue(undefined);
+    const Audio = vi.fn((currentUrl: string) => ({ currentUrl, play }));
+    vi.stubGlobal("Audio", Audio);
+    const { rerender } = render(<AudioButton url="audio-a.mp3" state="verified" />);
+    await userEvent.click(screen.getByRole("button", { name: /play audio/i }));
+
+    rerender(<AudioButton url="audio-b.mp3" state="verified" />);
+    await userEvent.click(screen.getByRole("button", { name: /play audio/i }));
+
+    expect(Audio).toHaveBeenNthCalledWith(1, "audio-a.mp3");
+    expect(Audio).toHaveBeenNthCalledWith(2, "audio-b.mp3");
+  });
 });
