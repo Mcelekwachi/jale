@@ -3,6 +3,7 @@ import {
   useEffect,
   useState,
   type ErrorInfo,
+  type PropsWithChildren,
   type ReactNode,
 } from "react";
 
@@ -194,14 +195,14 @@ function FlagQueue() {
   );
 }
 
-export function AdminRoute() {
+export function AdminRoute({ children }: PropsWithChildren) {
   const [profile, setProfile] = useState<ProfileState>({ status: "loading" });
 
   useEffect(() => {
     let active = true;
     void apiFetch<UserProfile>("/v1/me", { authenticated: true })
-      .then((value) =>
-        active && setProfile({ status: "loaded", profile: value }),
+      .then(
+        (value) => active && setProfile({ status: "loaded", profile: value }),
       )
       .catch(
         (error: unknown) =>
@@ -227,5 +228,5 @@ export function AdminRoute() {
     );
   }
   if (profile.profile.role !== "admin") return <NoAdminAccess />;
-  return <FlagQueue />;
+  return children ?? <FlagQueue />;
 }

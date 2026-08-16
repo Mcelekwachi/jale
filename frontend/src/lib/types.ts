@@ -119,6 +119,91 @@ export interface DueStudyItems {
 
 export type StudyDirection = "target_to_meta" | "meta_to_target";
 export type AudioState = "missing" | "placeholder" | "verified";
+export type ContentStatus = "draft" | "published" | "hidden";
+
+export interface AdminContentListItem {
+  id: number;
+  source_key: string;
+  language: string;
+  content_type: ContentType;
+  difficulty_level: Difficulty;
+  category: string | null;
+  target_text: string;
+  target_text_toned: string | null;
+  translation: string | null;
+  audio_url: string | null;
+  audio_state: AudioState;
+  status: ContentStatus;
+  verified: boolean;
+  flag_count: number;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminContentPage {
+  items: AdminContentListItem[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface AdminContentState {
+  id: number;
+  source_key: string;
+  language: string;
+  dialect: string | null;
+  category: string | null;
+  content_type: ContentType;
+  difficulty_level: Difficulty;
+  target_text: string;
+  target_text_toned: string | null;
+  example_sentence: string | null;
+  example_translation: string | null;
+  audio_url: string | null;
+  audio_state: AudioState;
+  status: ContentStatus;
+  verified: boolean;
+  verified_by: string | null;
+  verified_by_name: string | null;
+  verified_at: string | null;
+  contributor_id: string | null;
+  flag_count: number;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminTranslationState {
+  content_id: number;
+  meta_language: string;
+  translation: string;
+  literal_translation: string | null;
+  cultural_note: string | null;
+  verified: boolean;
+  verified_by: string | null;
+  verified_by_name: string | null;
+  verified_at: string | null;
+  contributor_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminTranslationSlot {
+  meta_language: string;
+  state: AdminTranslationState | null;
+}
+
+export interface AdminContentDetail {
+  item: AdminContentState;
+  translations: AdminTranslationSlot[];
+}
+
+export interface AdminVerificationResult {
+  target: "content" | "translation";
+  content: AdminContentState | null;
+  translation: AdminTranslationState | null;
+}
 
 export interface UserPreferences {
   active_language: string;
