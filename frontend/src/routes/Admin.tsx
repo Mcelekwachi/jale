@@ -3,6 +3,7 @@ import {
   useEffect,
   useState,
   type ErrorInfo,
+  type PropsWithChildren,
   type ReactNode,
 } from "react";
 
@@ -194,7 +195,7 @@ function FlagQueue() {
   );
 }
 
-export function AdminRoute() {
+export function AdminRoute({ children }: PropsWithChildren) {
   const [profile, setProfile] = useState<ProfileState>({ status: "loading" });
 
   useEffect(() => {
@@ -227,5 +228,5 @@ export function AdminRoute() {
     );
   }
   if (profile.profile.role !== "admin") return <NoAdminAccess />;
-  return <FlagQueue />;
+  return children ?? <FlagQueue />;
 }
