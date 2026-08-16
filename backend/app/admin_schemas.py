@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, RootModel, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.schemas import ContentType, Difficulty, FlagReason
 
@@ -39,7 +39,7 @@ class AdminFlagDecisionResult(BaseModel):
     id: int
     content_id: int
     user_id: UUID | None
-    meta_language_id: int | None
+    meta_language: str | None
     reason: FlagReason
     note: str | None
     status: FlagStatus
@@ -84,9 +84,9 @@ class AdminContentPage(BaseModel):
 class AdminContentState(BaseModel):
     id: int
     source_key: str
-    language_id: int
-    dialect_id: int | None
-    category_id: int | None
+    language: str
+    dialect: str | None
+    category: str | None
     content_type: ContentType
     difficulty_level: Difficulty
     target_text: str
@@ -98,6 +98,7 @@ class AdminContentState(BaseModel):
     status: ContentStatus
     verified: bool
     verified_by: UUID | None
+    verified_by_name: str | None
     verified_at: datetime | None
     contributor_id: UUID | None
     flag_count: int
@@ -108,20 +109,33 @@ class AdminContentState(BaseModel):
 
 class AdminTranslationState(BaseModel):
     content_id: int
-    meta_language_id: int
+    meta_language: str
     translation: str
     literal_translation: str | None
     cultural_note: str | None
     verified: bool
     verified_by: UUID | None
+    verified_by_name: str | None
     verified_at: datetime | None
     contributor_id: UUID | None
     created_at: datetime
     updated_at: datetime
 
 
-class AdminVerificationResult(RootModel[AdminContentState | AdminTranslationState]):
-    pass
+class AdminTranslationSlot(BaseModel):
+    meta_language: str
+    state: AdminTranslationState | None
+
+
+class AdminContentDetail(BaseModel):
+    item: AdminContentState
+    translations: list[AdminTranslationSlot]
+
+
+class AdminVerificationResult(BaseModel):
+    target: Literal["content", "translation"]
+    content: AdminContentState | None
+    translation: AdminTranslationState | None
 
 
 class AdminContentRevision(BaseModel):
@@ -130,8 +144,12 @@ class AdminContentRevision(BaseModel):
     changed_by: UUID | None
     changed_by_name: str | None
     change_note: str | None
-    before_state: dict[str, Any]
-    after_state: dict[str, Any]
+    before_state: dict[str, Any] = Field(
+        description="Raw database snapshot; may contain integer foreign keys."
+    )
+    after_state: dict[str, Any] = Field(
+        description="Raw database snapshot; may contain integer foreign keys."
+    )
     created_at: datetime
 
 

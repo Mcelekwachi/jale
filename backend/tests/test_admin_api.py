@@ -15,6 +15,7 @@ ADMIN_REQUESTS = [
     ("PATCH", "/v1/admin/flags/1", {"status": "resolved"}),
     ("POST", "/v1/admin/content/1/flags/resolve", {"resolution_note": "fixed"}),
     ("GET", "/v1/admin/content", None),
+    ("GET", "/v1/admin/content/1", None),
     ("PATCH", "/v1/admin/content/1", {"target_text": "Ndewo"}),
     ("PATCH", "/v1/admin/content/1/translations/eng", {"translation": "Hello"}),
     ("POST", "/v1/admin/content/1/verify", {"meta_language": None}),
@@ -289,7 +290,10 @@ async def test_translation_verification_contributors_and_user_search(
                 json={"meta_language": "eng"},
             )
             assert verified.status_code == 200
-            assert verified.json()["verified_by"] == str(admin_id)
+            assert verified.json()["target"] == "translation"
+            assert verified.json()["content"] is None
+            assert verified.json()["translation"]["verified_by"] == str(admin_id)
+            assert verified.json()["translation"]["meta_language"] == "eng"
             granted = await client.post(
                 "/v1/admin/contributors",
                 headers=admin_headers,
@@ -430,3 +434,65 @@ async def test_admin_content_filters_match_public_filter_semantics(
             if content_ids:
                 with db_connection(database_url) as conn:
                     conn.execute("DELETE FROM content_items WHERE id=ANY(%s)", (content_ids,))
+
+
+async def test_admin_content_detail_distinguishes_missing_and_empty_translations(
+    client, database_url, auth_headers
+):
+    admin_id, admin_headers = await provision_admin(client, database_url, auth_headers)
+    content_id = disposable_content(database_url)
+    with isolated_test_users(admin_id):
+        try:
+            with db_connection(database_url) as conn:
+                english_id = conn.execute("SELECT id FROM languages WHERE code='eng'").fetchone()[0]
+                conn.execute(
+                    "INSERT INTO content_translations "
+                    "(content_id, meta_language_id, translation) VALUES (%s,%s,'')",
+                    (content_id, english_id),
+                )
+
+            response = await client.get(f"/v1/admin/content/{content_id}", headers=admin_headers)
+
+            assert response.status_code == 200
+            detail = response.json()
+            assert detail["item"]["language"] == "ibo"
+            assert (
+                not {
+                    "language_id",
+                    "dialect_id",
+                    "category_id",
+                }
+                & detail["item"].keys()
+            )
+            translations = {slot["meta_language"]: slot["state"] for slot in detail["translations"]}
+            assert translations["eng"]["translation"] == ""
+            assert translations["eng"]["meta_language"] == "eng"
+            assert translations["nld"] is None
+        finally:
+            with db_connection(database_url) as conn:
+                conn.execute("DELETE FROM content_items WHERE id=%s", (content_id,))
+
+
+async def test_admin_content_detail_returns_404_for_unknown_item(
+    client, database_url, auth_headers
+):
+    admin_id, admin_headers = await provision_admin(client, database_url, auth_headers)
+    with isolated_test_users(admin_id):
+        response = await client.get("/v1/admin/content/2147483647", headers=admin_headers)
+        assert response.status_code == 404
+
+
+async def test_missing_dutch_translation_filter_returns_the_fifty_proverbs(
+    client, database_url, auth_headers
+):
+    admin_id, admin_headers = await provision_admin(client, database_url, auth_headers)
+    with isolated_test_users(admin_id):
+        response = await client.get(
+            "/v1/admin/content?missing_translation=nld&limit=100", headers=admin_headers
+        )
+
+        assert response.status_code == 200
+        page = response.json()
+        assert page["total"] == 50
+        assert len(page["items"]) == 50
+        assert {item["content_type"] for item in page["items"]} == {"proverb"}

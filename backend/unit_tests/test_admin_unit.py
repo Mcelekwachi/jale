@@ -14,6 +14,7 @@ ADMIN_REQUESTS = [
     ("PATCH", "/v1/admin/flags/1", {"status": "resolved"}),
     ("POST", "/v1/admin/content/1/flags/resolve", {"resolution_note": "fixed"}),
     ("GET", "/v1/admin/content", None),
+    ("GET", "/v1/admin/content/1", None),
     ("PATCH", "/v1/admin/content/1", {"target_text": "Ndewo"}),
     ("PATCH", "/v1/admin/content/1/translations/eng", {"translation": "Hello"}),
     ("POST", "/v1/admin/content/1/verify", {"meta_language": None}),
@@ -75,6 +76,7 @@ def test_admin_data_endpoints_publish_named_response_models():
         ("/v1/admin/flags/{flag_id}", "patch"): "AdminFlagDecisionResult",
         ("/v1/admin/content/{content_id}/flags/resolve", "post"): "BulkFlagResolutionResult",
         ("/v1/admin/content", "get"): "AdminContentPage",
+        ("/v1/admin/content/{content_id}", "get"): "AdminContentDetail",
         ("/v1/admin/content/{content_id}", "patch"): "AdminContentState",
         (
             "/v1/admin/content/{content_id}/translations/{meta_language}",
@@ -97,8 +99,22 @@ def test_admin_data_endpoints_publish_named_response_models():
         assert response_schema == {"$ref": "#/components/schemas/AdminVerificationResult"}
 
     assert "AdminFlagQueueFlag" in schema["components"]["schemas"]
-    verification_result = schema["components"]["schemas"]["AdminVerificationResult"]
-    assert {choice["$ref"] for choice in verification_result["anyOf"]} == {
-        "#/components/schemas/AdminContentState",
-        "#/components/schemas/AdminTranslationState",
-    }
+    models = schema["components"]["schemas"]
+    content_fields = models["AdminContentState"]["properties"]
+    assert {"language", "dialect", "category", "verified_by_name"} <= content_fields.keys()
+    assert not {"language_id", "dialect_id", "category_id"} & content_fields.keys()
+
+    translation_fields = models["AdminTranslationState"]["properties"]
+    assert {"meta_language", "verified_by_name"} <= translation_fields.keys()
+    assert "meta_language_id" not in translation_fields
+
+    flag_fields = models["AdminFlagDecisionResult"]["properties"]
+    assert "meta_language" in flag_fields
+    assert "meta_language_id" not in flag_fields
+
+    verification_fields = models["AdminVerificationResult"]["properties"]
+    assert set(verification_fields) == {"target", "content", "translation"}
+
+    revision_fields = models["AdminContentRevision"]["properties"]
+    for field in ("before_state", "after_state"):
+        assert "raw database snapshot" in revision_fields[field]["description"].lower()

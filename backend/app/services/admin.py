@@ -11,6 +11,25 @@ from app.config import get_settings
 from app.content_filters import content_filter_sql
 from app.db import get_pool
 
+_CONTENT_STATE_COLUMNS = """
+    c.id, c.source_key, language.code AS language, dialect.code AS dialect,
+    category.slug AS category, c.content_type, c.difficulty_level,
+    c.target_text, c.target_text_toned, c.example_sentence,
+    c.example_translation, c.audio_url, c.audio_state, c.status,
+    c.verified, c.verified_by, verifier.display_name AS verified_by_name,
+    c.verified_at, c.contributor_id, c.flag_count, c.sort_order,
+    c.created_at, c.updated_at
+"""
+
+_TRANSLATION_STATE_COLUMNS = """
+    translation.content_id, meta_language.code AS meta_language,
+    translation.translation, translation.literal_translation,
+    translation.cultural_note, translation.verified,
+    translation.verified_by, verifier.display_name AS verified_by_name,
+    translation.verified_at, translation.contributor_id,
+    translation.created_at, translation.updated_at
+"""
+
 
 async def list_flags(
     *, status: str, reason: str | None, language: str | None, limit: int, offset: int
@@ -43,11 +62,21 @@ async def resolve_flag(flag_id: int, admin_id: UUID, status: str, note: str | No
         row = await (
             await conn.execute(
                 """
-            UPDATE content_flags
+            WITH updated AS (
+              UPDATE content_flags
                SET status=%(status)s::flag_status, resolution_note=%(note)s,
                    resolved_by=%(admin)s, resolved_at=now()
              WHERE id=%(id)s AND status IN ('open','in_review')
          RETURNING *
+            )
+            SELECT updated.id, updated.content_id, updated.user_id,
+                   meta_language.code AS meta_language, updated.reason,
+                   updated.note, updated.status, updated.created_at,
+                   updated.resolved_by, updated.resolved_at,
+                   updated.resolution_note
+              FROM updated
+              LEFT JOIN languages meta_language
+                ON meta_language.id=updated.meta_language_id
             """,
                 {"id": flag_id, "status": status, "note": note, "admin": admin_id},
             )
@@ -93,6 +122,7 @@ async def list_content(
     verified: bool | None,
     audio_state: str | None,
     has_flags: bool | None,
+    missing_translation: str | None,
     limit: int,
     offset: int,
 ) -> dict:
@@ -105,6 +135,7 @@ async def list_content(
         "verified": verified,
         "audio_state": audio_state,
         "has_flags": has_flags,
+        "missing_translation": missing_translation,
         "limit": limit,
         "offset": offset,
         "default_meta": get_settings().default_meta_language,
@@ -113,6 +144,17 @@ async def list_content(
       WHERE (%(status)s::content_status IS NULL OR c.status=%(status)s)
         AND (%(audio_state)s::audio_status IS NULL OR c.audio_state=%(audio_state)s)
         AND (%(has_flags)s::boolean IS NULL OR (c.flag_count > 0)=%(has_flags)s)
+        AND (
+              %(missing_translation)s::text IS NULL
+              OR NOT EXISTS (
+                   SELECT 1
+                     FROM content_translations missing_translation
+                     JOIN languages missing_language
+                       ON missing_language.id=missing_translation.meta_language_id
+                    WHERE missing_translation.content_id=c.id
+                      AND missing_language.code=%(missing_translation)s
+                 )
+            )
         """ + content_filter_sql("ct.translation")
     joins = """
       JOIN languages l ON l.id=c.language_id
@@ -121,6 +163,15 @@ async def list_content(
       LEFT JOIN content_translations ct ON ct.content_id=c.id AND ct.meta_language_id=ml.id
     """
     async with get_pool().connection() as conn:
+        if missing_translation is not None:
+            language = await (
+                await conn.execute(
+                    "SELECT 1 FROM languages WHERE code=%s AND is_meta",
+                    (missing_translation,),
+                )
+            ).fetchone()
+            if language is None:
+                raise HTTPException(status_code=422, detail="invalid meta language")
         total = await (
             await conn.execute(
                 "SELECT count(*)::int AS n FROM content_items c" + joins + where, params
@@ -150,8 +201,8 @@ async def list_content(
         }
 
 
-async def _content_state(conn, content_id: int, *, lock: bool = False) -> dict:
-    suffix = " FOR UPDATE" if lock else ""
+async def _raw_content_state(conn, content_id: int, *, lock: bool = False) -> dict:
+    suffix = " FOR UPDATE OF c" if lock else ""
     row = await (
         await conn.execute(
             f"SELECT to_jsonb(c) AS state FROM content_items c WHERE id=%s{suffix}", (content_id,)
@@ -160,6 +211,65 @@ async def _content_state(conn, content_id: int, *, lock: bool = False) -> dict:
     if row is None:
         raise HTTPException(status_code=404, detail="content not found")
     return row["state"]
+
+
+async def _content_state(conn, content_id: int) -> dict:
+    row = await (
+        await conn.execute(
+            f"""SELECT {_CONTENT_STATE_COLUMNS}
+                  FROM content_items c
+                  JOIN languages language ON language.id=c.language_id
+                  LEFT JOIN dialects dialect ON dialect.id=c.dialect_id
+                  LEFT JOIN categories category ON category.id=c.category_id
+                  LEFT JOIN app_users verifier ON verifier.id=c.verified_by
+                 WHERE c.id=%s""",
+            (content_id,),
+        )
+    ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="content not found")
+    return dict(row)
+
+
+async def _translation_state(conn, content_id: int, meta_language: str) -> dict | None:
+    row = await (
+        await conn.execute(
+            f"""SELECT {_TRANSLATION_STATE_COLUMNS}
+                  FROM content_translations translation
+                  JOIN languages meta_language
+                    ON meta_language.id=translation.meta_language_id
+                  LEFT JOIN app_users verifier ON verifier.id=translation.verified_by
+                 WHERE translation.content_id=%s AND meta_language.code=%s""",
+            (content_id, meta_language),
+        )
+    ).fetchone()
+    return dict(row) if row is not None else None
+
+
+async def get_content_detail(content_id: int) -> dict:
+    async with get_pool().connection() as conn:
+        item = await _content_state(conn, content_id)
+        rows = await (
+            await conn.execute(
+                f"""SELECT {_TRANSLATION_STATE_COLUMNS}
+                      FROM languages meta_language
+                      LEFT JOIN content_translations translation
+                        ON translation.meta_language_id=meta_language.id
+                       AND translation.content_id=%s
+                      LEFT JOIN app_users verifier ON verifier.id=translation.verified_by
+                     WHERE meta_language.is_meta
+                     ORDER BY meta_language.code""",
+                (content_id,),
+            )
+        ).fetchall()
+        translations = [
+            {
+                "meta_language": row["meta_language"],
+                "state": dict(row) if row["content_id"] is not None else None,
+            }
+            for row in rows
+        ]
+        return {"item": item, "translations": translations}
 
 
 async def _revision(
@@ -184,7 +294,7 @@ async def patch_content(
         "sort_order",
     }
     async with get_pool().connection() as conn, conn.transaction():
-        before = await _content_state(conn, content_id, lock=True)
+        before = await _raw_content_state(conn, content_id, lock=True)
         if "category" in changes:
             slug = changes.pop("category")
             if slug is None:
@@ -207,9 +317,9 @@ async def patch_content(
                 f"UPDATE content_items SET {assignments} WHERE id=%(content_id)s",
                 {"content_id": content_id, **changes},
             )
-        after = await _content_state(conn, content_id)
+        after = await _raw_content_state(conn, content_id)
         await _revision(conn, content_id, admin_id, note, before, after)
-        return after
+        return await _content_state(conn, content_id)
 
 
 async def patch_translation(
@@ -218,7 +328,7 @@ async def patch_translation(
     async with get_pool().connection() as conn:
         try:
             async with conn.transaction():
-                await _content_state(conn, content_id, lock=True)
+                await _raw_content_state(conn, content_id, lock=True)
                 language = await (
                     await conn.execute(
                         "SELECT id FROM languages WHERE code=%s AND is_meta", (meta_language,)
@@ -264,7 +374,10 @@ async def patch_translation(
                 ).fetchone()
                 after = after_row["state"]
                 await _revision(conn, content_id, admin_id, note, before, after)
-                return after
+                state = await _translation_state(conn, content_id, meta_language)
+                if state is None:
+                    raise HTTPException(status_code=404, detail="translation not found")
+                return state
         except RaiseException as exc:
             if "cultural_note is required" in str(exc):
                 raise HTTPException(
@@ -277,14 +390,14 @@ async def set_verified(
     content_id: int, meta_language: str | None, admin_id: UUID, verified: bool, note: str | None
 ) -> dict:
     async with get_pool().connection() as conn, conn.transaction():
-        await _content_state(conn, content_id, lock=True)
+        await _raw_content_state(conn, content_id, lock=True)
         if meta_language is None:
-            before = await _content_state(conn, content_id)
+            before = await _raw_content_state(conn, content_id)
             await conn.execute(
                 "UPDATE content_items SET verified=%s, verified_by=%s, verified_at=CASE WHEN %s THEN now() ELSE NULL END WHERE id=%s",
                 (verified, admin_id if verified else None, verified, content_id),
             )
-            after = await _content_state(conn, content_id)
+            after = await _raw_content_state(conn, content_id)
         else:
             language = await (
                 await conn.execute(
@@ -316,7 +429,16 @@ async def set_verified(
                 ).fetchone()
             )["state"]
         await _revision(conn, content_id, admin_id, note, before, after)
-        return after
+        if meta_language is None:
+            return {
+                "target": "content",
+                "content": await _content_state(conn, content_id),
+                "translation": None,
+            }
+        translation = await _translation_state(conn, content_id, meta_language)
+        if translation is None:
+            raise HTTPException(status_code=404, detail="translation not found")
+        return {"target": "translation", "content": None, "translation": translation}
 
 
 async def list_revisions(content_id: int) -> list[dict]:
