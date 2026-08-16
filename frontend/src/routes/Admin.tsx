@@ -201,8 +201,8 @@ export function AdminRoute({ children }: PropsWithChildren) {
   useEffect(() => {
     let active = true;
     void apiFetch<UserProfile>("/v1/me", { authenticated: true })
-      .then((value) =>
-        active && setProfile({ status: "loaded", profile: value }),
+      .then(
+        (value) => active && setProfile({ status: "loaded", profile: value }),
       )
       .catch(
         (error: unknown) =>

@@ -106,8 +106,12 @@ describe("AdminContentDetailRoute", () => {
     });
     renderDetail();
 
-    expect(await screen.findByText(/no dutch translation yet/i)).toBeInTheDocument();
-    expect(screen.getByText(/english translation exists but is blank/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/no dutch translation yet/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/english translation exists but is blank/i),
+    ).toBeInTheDocument();
   });
 
   it("keeps identity fields read-only and renders every audio state", async () => {
@@ -116,9 +120,15 @@ describe("AdminContentDetailRoute", () => {
 
     await screen.findByRole("heading", { name: /edit content/i });
     expect(screen.getByText(item.source_key)).toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: /source key/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: /^language$/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: /content type/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: /source key/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: /^language$/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: /content type/i }),
+    ).not.toBeInTheDocument();
     const audioState = screen.getByRole("combobox", { name: /audio state/i });
     expect(audioState).toHaveTextContent("Missing");
     expect(audioState).toHaveTextContent("Placeholder");
@@ -149,7 +159,9 @@ describe("AdminContentDetailRoute", () => {
     await userEvent.click(
       await screen.findByRole("button", { name: /create dutch translation/i }),
     );
-    const translation = screen.getByRole("textbox", { name: /^dutch translation$/i });
+    const translation = screen.getByRole("textbox", {
+      name: /^dutch translation$/i,
+    });
     await userEvent.type(translation, "Een spreekwoord");
     await userEvent.type(
       screen.getByRole("textbox", { name: /dutch change note/i }),
@@ -163,5 +175,39 @@ describe("AdminContentDetailRoute", () => {
       "cultural_note is required for proverb translations",
     );
     expect(translation).toHaveValue("Een spreekwoord");
+    expect(apiFetch).toHaveBeenLastCalledWith(
+      "/v1/admin/content/42/translations/nld",
+      expect.objectContaining({ method: "PATCH" }),
+    );
+  });
+
+  it("uses the verification target to update the returned resource", async () => {
+    vi.mocked(apiFetch)
+      .mockResolvedValueOnce({
+        item,
+        translations: [{ meta_language: "eng", state: emptyEnglish }],
+      })
+      .mockResolvedValueOnce({
+        target: "translation",
+        content: null,
+        translation: {
+          ...emptyEnglish,
+          verified: true,
+          verified_by: "reviewer-1",
+          verified_by_name: "Reviewer",
+          verified_at: "2026-08-16T12:00:00Z",
+        },
+      });
+    renderDetail();
+    await userEvent.type(
+      await screen.findByRole("textbox", { name: /item change note/i }),
+      "Review translation",
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /verify item/i }));
+
+    expect(
+      await screen.findByText(/verified by reviewer/i),
+    ).toBeInTheDocument();
   });
 });
