@@ -231,6 +231,15 @@ export function AdminContentList() {
               options={["true", "false"]}
               onChange={(has_flags) => update({ has_flags })}
             />
+            <FilterSelect
+              label="Missing translation"
+              value={filters.missing_translation}
+              options={["eng", "nld"]}
+              optionLabels={{ eng: "English", nld: "Dutch" }}
+              onChange={(missing_translation) =>
+                update({ missing_translation })
+              }
+            />
             <label className="flex items-end">
               <button
                 className={`${secondaryClass} w-full`}
@@ -280,17 +289,16 @@ export function AdminContentList() {
                     {page.value.items.map((item) => (
                       <tr
                         key={item.id}
-                        tabIndex={0}
-                        aria-label={`Edit ${item.target_text}`}
                         className={`cursor-pointer border-t border-sand hover:bg-ochre-soft ${item.status === "published" ? "" : "bg-terracotta-soft/40 opacity-80"}`}
                         onClick={() => navigate(`/admin/content/${item.id}`)}
-                        onKeyDown={(event) =>
-                          event.key === "Enter" &&
-                          navigate(`/admin/content/${item.id}`)
-                        }
                       >
                         <td className="px-4 py-3 font-display text-base font-semibold text-indigo-deep">
-                          {item.target_text}
+                          <Link
+                            className="underline decoration-ochre decoration-2 underline-offset-4"
+                            to={`/admin/content/${item.id}`}
+                          >
+                            {item.target_text}
+                          </Link>
                         </td>
                         <td className="px-4 py-3">{item.content_type}</td>
                         <td className="max-w-xs px-4 py-3 text-muted">
@@ -345,11 +353,13 @@ function FilterSelect({
   label,
   value,
   options,
+  optionLabels,
   onChange,
 }: {
   label: string;
   value: string;
   options: string[];
+  optionLabels?: Record<string, string>;
   onChange: (value: string) => void;
 }) {
   return (
@@ -363,7 +373,7 @@ function FilterSelect({
         <option value="">All</option>
         {options.map((option) => (
           <option key={option} value={option}>
-            {title(option)}
+            {optionLabels?.[option] ?? title(option)}
           </option>
         ))}
       </select>
