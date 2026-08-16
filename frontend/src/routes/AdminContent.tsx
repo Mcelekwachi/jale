@@ -15,6 +15,7 @@ import type {
   ContentStatus,
   Difficulty,
 } from "../lib/types";
+import { AudioButton } from "../study/AudioButton";
 
 type LoadState<T> =
   | { status: "loading" }
@@ -521,16 +522,6 @@ function ItemEditor({
             value={form.audio_url}
             onChange={(value) => set("audio_url", value)}
           />
-          {form.audio_url && (
-            <a
-              className="mt-2 inline-block text-sm text-indigo-rich underline"
-              href={form.audio_url}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Open current audio
-            </a>
-          )}
         </div>
         <SelectField
           label="Audio state"
@@ -538,11 +529,12 @@ function ItemEditor({
           options={["missing", "placeholder", "verified"]}
           onChange={(value) => set("audio_state", value)}
         />
-        {form.audio_url && (
-          <audio className="w-full sm:col-span-2" controls src={form.audio_url}>
-            Your browser cannot play this audio.
-          </audio>
-        )}
+        <div className="sm:col-span-2">
+          <AudioButton
+            url={form.audio_url || null}
+            state={form.audio_state}
+          />
+        </div>
         <SelectField
           label="Status"
           value={form.status}

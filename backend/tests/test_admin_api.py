@@ -265,6 +265,24 @@ async def test_content_edits_are_audited_and_proverb_validation_is_readable(
             ).json()
             assert revisions[0]["before_state"]["target_text"] == before_text
             assert revisions[0]["after_state"]["target_text"] == changed
+
+            audio_response = await client.patch(
+                f"/v1/admin/content/{content_id}",
+                headers=admin_headers,
+                json={
+                    "audio_url": "https://example.test/verified.mp3",
+                    "audio_state": "verified",
+                    "change_note": "verify audio",
+                },
+            )
+            assert audio_response.status_code == 200
+            assert audio_response.json()["audio_state"] == "verified"
+            subsequent_read = await client.get(
+                f"/v1/admin/content/{content_id}", headers=admin_headers
+            )
+            assert subsequent_read.status_code == 200
+            assert subsequent_read.json()["item"]["audio_state"] == "verified"
+
             invalid = await client.patch(
                 f"/v1/admin/content/{proverb_id}/translations/eng",
                 headers=admin_headers,
