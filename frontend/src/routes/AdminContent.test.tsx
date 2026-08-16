@@ -135,6 +135,19 @@ describe("AdminContentDetailRoute", () => {
     expect(audioState).toHaveTextContent("Verified");
   });
 
+  it("disables the inline player when audio state is missing despite a URL", async () => {
+    vi.mocked(apiFetch).mockResolvedValue({
+      item: { ...item, audio_state: "missing" },
+      translations: [],
+    });
+    renderDetail();
+
+    expect(
+      await screen.findByRole("button", { name: /audio coming soon/i }),
+    ).toBeDisabled();
+    expect(document.querySelector("audio")).not.toBeInTheDocument();
+  });
+
   it("requires a change note before saving", async () => {
     vi.mocked(apiFetch).mockResolvedValue({ item, translations: [] });
     renderDetail();

@@ -7,7 +7,7 @@ export function AudioButton({
   url?: string | null;
   state: string;
 }) {
-  const audio = useRef<HTMLAudioElement | null>(null);
+  const audio = useRef<{ url: string; element: HTMLAudioElement } | null>(null);
   const [error, setError] = useState(false);
   if (state === "missing" || !url)
     return (
@@ -21,8 +21,10 @@ export function AudioButton({
     );
   const play = async () => {
     try {
-      audio.current ??= new Audio(url);
-      await audio.current.play();
+      if (audio.current?.url !== url) {
+        audio.current = { url, element: new Audio(url) };
+      }
+      await audio.current.element.play();
       setError(false);
     } catch {
       setError(true);
