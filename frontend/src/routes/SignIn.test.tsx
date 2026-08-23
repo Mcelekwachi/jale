@@ -26,6 +26,28 @@ function authValue(
 }
 
 describe("SignIn", () => {
+  it("renders enabled Google sign-in first as the primary action", () => {
+    vi.stubEnv("VITE_GOOGLE_ENABLED", "true");
+    mockedUseAuth.mockReturnValue(authValue());
+    render(
+      <MemoryRouter>
+        <SignIn />
+      </MemoryRouter>,
+    );
+
+    const google = screen.getByRole("button", {
+      name: /continue with google/i,
+    });
+    const email = screen.getByLabelText(/email address/i);
+    const magicLink = screen.getByRole("button", { name: /send magic link/i });
+
+    expect(
+      google.compareDocumentPosition(email) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(google).toHaveClass("bg-indigo-deep");
+    expect(magicLink).not.toHaveClass("bg-indigo-deep");
+  });
+
   it("shows a check-your-email state after sending a magic link", async () => {
     mockedUseAuth.mockReturnValue(authValue());
     render(
@@ -51,7 +73,12 @@ describe("SignIn", () => {
     expect(
       screen.queryByRole("button", { name: /continue with google/i }),
     ).not.toBeInTheDocument();
-    expect(screen.queryByText(/^or$/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/or continue with email/i),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /send magic link/i }),
+    ).toHaveClass("bg-indigo-deep");
   });
 
   it("toggles from the magic-link form to the password form", async () => {
