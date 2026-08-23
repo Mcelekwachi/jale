@@ -123,6 +123,18 @@ export function SignIn() {
             </h1>
           </div>
           {error && <ErrorMessage message={error} />}
+          {googleEnabled && (
+            <>
+              <Button type="button" busy={busy} onClick={continueWithGoogle}>
+                Continue with Google
+              </Button>
+              <div className="flex items-center gap-3 text-xs uppercase tracking-widest text-muted">
+                <span className="h-px flex-1 bg-sand" />
+                or continue with email
+                <span className="h-px flex-1 bg-sand" />
+              </div>
+            </>
+          )}
           {mode === "password" ? (
             <form className="space-y-4" onSubmit={submitPassword}>
               <label className="block text-sm font-semibold" htmlFor="email">
@@ -152,7 +164,11 @@ export function SignIn() {
                 onChange={(event) => setPassword(event.target.value)}
                 className="min-h-11 w-full rounded-2xl border border-sand bg-white px-4 py-3 outline-none focus:border-ochre focus:ring-2 focus:ring-ochre-soft"
               />
-              <Button type="submit" busy={busy}>
+              <Button
+                type="submit"
+                variant={googleEnabled ? "secondary" : "primary"}
+                busy={busy}
+              >
                 Sign in
               </Button>
               <button
@@ -188,7 +204,11 @@ export function SignIn() {
                 className="min-h-11 w-full rounded-2xl border border-sand bg-white px-4 py-3 outline-none focus:border-ochre focus:ring-2 focus:ring-ochre-soft"
                 placeholder="you@example.com"
               />
-              <Button type="submit" busy={busy}>
+              <Button
+                type="submit"
+                variant={googleEnabled ? "secondary" : "primary"}
+                busy={busy}
+              >
                 Send magic link
               </Button>
             </form>
@@ -201,23 +221,6 @@ export function SignIn() {
             >
               Sign in with a password instead
             </button>
-          )}
-          {googleEnabled && (
-            <>
-              <div className="flex items-center gap-3 text-xs uppercase tracking-widest text-muted">
-                <span className="h-px flex-1 bg-sand" />
-                or
-                <span className="h-px flex-1 bg-sand" />
-              </div>
-              <Button
-                type="button"
-                variant="secondary"
-                busy={busy}
-                onClick={continueWithGoogle}
-              >
-                Continue with Google
-              </Button>
-            </>
           )}
         </div>
       </section>
