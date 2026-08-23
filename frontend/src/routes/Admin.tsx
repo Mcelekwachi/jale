@@ -9,7 +9,7 @@ import {
 
 import { ErrorMessage } from "../components/ErrorMessage";
 import { Spinner } from "../components/Spinner";
-import { apiFetch } from "../lib/api";
+import { ApiError, apiFetch } from "../lib/api";
 import type { ContentType, UserProfile } from "../lib/types";
 
 interface AdminFlag {
@@ -100,6 +100,16 @@ function messageFrom(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
+function isConflict(error: unknown): boolean {
+  return (
+    (error instanceof ApiError && error.status === 409) ||
+    (typeof error === "object" &&
+      error !== null &&
+      "status" in error &&
+      error.status === 409)
+  );
+}
+
 function NoAdminAccess() {
   return (
     <main className="grid min-h-dvh place-content-center bg-warm p-5">
@@ -117,12 +127,20 @@ function NoAdminAccess() {
 
 function FlagQueue() {
   const [queue, setQueue] = useState<QueueState>({ status: "loading" });
+  const [notes, setNotes] = useState<Record<number, string>>({});
+  const [bulkNotes, setBulkNotes] = useState<Record<number, string>>({});
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const loadQueue = () =>
+    apiFetch<AdminFlagQueueItem[]>("/v1/admin/flags", {
+      authenticated: true,
+    });
 
   useEffect(() => {
     let active = true;
-    void apiFetch<AdminFlagQueueItem[]>("/v1/admin/flags", {
-      authenticated: true,
-    })
+    void loadQueue()
       .then((items) => active && setQueue({ status: "loaded", items }))
       .catch(
         (error: unknown) =>
@@ -136,6 +154,101 @@ function FlagQueue() {
       active = false;
     };
   }, []);
+
+  const removeFlag = (contentId: number, flagId: number) => {
+    setQueue((current) => {
+      if (current.status !== "loaded") return current;
+      const items = current.items.flatMap((item) => {
+        if (item.content_id !== contentId) return [item];
+        const flags = item.flags.filter((flag) => flag.id !== flagId);
+        if (flags.length === 0) return [];
+        return [
+          {
+            ...item,
+            flags,
+            flag_count: flags.length,
+            reasons: [...new Set(flags.map((flag) => flag.reason))],
+          },
+        ];
+      });
+      return { status: "loaded", items };
+    });
+  };
+
+  const refreshAfterConflict = async () => {
+    const items = await loadQueue();
+    setQueue({ status: "loaded", items });
+    setMessage("This flag was already resolved");
+  };
+
+  const updateFlag = async (
+    contentId: number,
+    flagId: number,
+    status: "resolved" | "rejected",
+  ) => {
+    const resolutionNote = notes[flagId]?.trim() ?? "";
+    setMessage(null);
+    setActionError(null);
+    if (status === "rejected" && !resolutionNote) {
+      setActionError("A resolution note is required to reject a flag");
+      return;
+    }
+    setPendingAction(`${status}-${flagId}`);
+    try {
+      await apiFetch(`/v1/admin/flags/${flagId}`, {
+        authenticated: true,
+        method: "PATCH",
+        body: JSON.stringify({
+          status,
+          resolution_note: resolutionNote || null,
+        }),
+      });
+      removeFlag(contentId, flagId);
+      setMessage(status === "resolved" ? "Flag resolved" : "Flag rejected");
+    } catch (error) {
+      if (isConflict(error)) {
+        await refreshAfterConflict();
+      } else {
+        setActionError(messageFrom(error, `Unable to ${status} the flag`));
+      }
+    } finally {
+      setPendingAction(null);
+    }
+  };
+
+  const resolveAll = async (contentId: number) => {
+    setMessage(null);
+    setActionError(null);
+    setPendingAction(`all-${contentId}`);
+    try {
+      await apiFetch(`/v1/admin/content/${contentId}/flags/resolve`, {
+        authenticated: true,
+        method: "POST",
+        body: JSON.stringify({
+          resolution_note: bulkNotes[contentId]?.trim() || null,
+        }),
+      });
+      setQueue((current) =>
+        current.status === "loaded"
+          ? {
+              status: "loaded",
+              items: current.items.filter(
+                (item) => item.content_id !== contentId,
+              ),
+            }
+          : current,
+      );
+      setMessage("All flags resolved");
+    } catch (error) {
+      if (isConflict(error)) {
+        await refreshAfterConflict();
+      } else {
+        setActionError(messageFrom(error, "Unable to resolve all flags"));
+      }
+    } finally {
+      setPendingAction(null);
+    }
+  };
 
   if (queue.status === "loading") {
     return <Spinner label="Loading flag queue" fullScreen />;
@@ -152,6 +265,22 @@ function FlagQueue() {
     <main className="min-h-dvh bg-warm p-5 sm:p-8">
       <div className="mx-auto max-w-5xl">
         <h1 className="font-display text-3xl text-indigo-deep">Flag queue</h1>
+        {message && (
+          <p
+            role="status"
+            className="mt-4 rounded-xl bg-ochre-soft p-3 text-indigo-deep"
+          >
+            {message}
+          </p>
+        )}
+        {actionError && (
+          <p
+            role="alert"
+            className="mt-4 rounded-xl bg-terracotta-soft p-3 text-terracotta-dark"
+          >
+            {actionError}
+          </p>
+        )}
         {queue.items.length === 0 ? (
           <p className="mt-6 rounded-2xl bg-cream p-6 text-muted shadow-card">
             There are no open flags.
@@ -186,6 +315,92 @@ function FlagQueue() {
                     </li>
                   ))}
                 </ul>
+                <ul className="mt-5 grid list-none gap-3 p-0">
+                  {item.flags.map((flag) => (
+                    <li
+                      key={flag.id}
+                      className="rounded-xl border border-indigo-deep/10 p-4"
+                    >
+                      <p className="font-semibold text-indigo-deep">
+                        {flag.reason.replaceAll("_", " ")}
+                      </p>
+                      {flag.note && (
+                        <p className="mt-1 text-sm text-muted">{flag.note}</p>
+                      )}
+                      <label className="mt-3 block text-sm font-semibold text-indigo-deep">
+                        Resolution note for flag {flag.id}
+                        <textarea
+                          className="mt-1 min-h-20 w-full rounded-xl border border-indigo-deep/20 bg-white p-3 font-normal"
+                          value={notes[flag.id] ?? ""}
+                          onChange={(event) =>
+                            setNotes((current) => ({
+                              ...current,
+                              [flag.id]: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          aria-label={`Resolve flag ${flag.id}`}
+                          disabled={pendingAction !== null}
+                          className="rounded-xl bg-indigo-deep px-4 py-2 font-semibold text-white disabled:opacity-50"
+                          onClick={() =>
+                            void updateFlag(
+                              item.content_id,
+                              flag.id,
+                              "resolved",
+                            )
+                          }
+                        >
+                          Resolve
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`Reject flag ${flag.id}`}
+                          disabled={pendingAction !== null}
+                          className="rounded-xl border border-terracotta-dark px-4 py-2 font-semibold text-terracotta-dark disabled:opacity-50"
+                          onClick={() =>
+                            void updateFlag(
+                              item.content_id,
+                              flag.id,
+                              "rejected",
+                            )
+                          }
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                {item.flags.length > 1 && (
+                  <div className="mt-5 border-t border-indigo-deep/10 pt-5">
+                    <label className="block text-sm font-semibold text-indigo-deep">
+                      Shared resolution note for {item.target_text}
+                      <textarea
+                        className="mt-1 min-h-20 w-full rounded-xl border border-indigo-deep/20 bg-white p-3 font-normal"
+                        value={bulkNotes[item.content_id] ?? ""}
+                        onChange={(event) =>
+                          setBulkNotes((current) => ({
+                            ...current,
+                            [item.content_id]: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      aria-label={`Resolve all flags for ${item.target_text}`}
+                      disabled={pendingAction !== null}
+                      className="mt-3 rounded-xl bg-indigo-deep px-4 py-2 font-semibold text-white disabled:opacity-50"
+                      onClick={() => void resolveAll(item.content_id)}
+                    >
+                      Resolve all
+                    </button>
+                  </div>
+                )}
               </li>
             ))}
           </ul>
