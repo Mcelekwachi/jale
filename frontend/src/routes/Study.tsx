@@ -18,6 +18,23 @@ import { answerQueue } from "../study/answerQueueService";
 import { AudioButton } from "../study/AudioButton";
 import { FlagSheet } from "../study/FlagSheet";
 
+const META_LANGUAGE_KEY = "jale:meta-language";
+
+async function loadMetaLanguage(): Promise<string> {
+  try {
+    const profile = await apiFetch<UserProfile>("/v1/me", {
+      authenticated: true,
+    });
+    const code = profile.preferences.meta_language ?? defaultMetaLanguage();
+    localStorage.setItem(META_LANGUAGE_KEY, code);
+    return code;
+  } catch (error) {
+    if (!navigator.onLine)
+      return localStorage.getItem(META_LANGUAGE_KEY) ?? defaultMetaLanguage();
+    throw error;
+  }
+}
+
 export function Study() {
   const { trackSlug = "", unitPosition = "" } = useParams();
   const [session, setSession] = useState<StudySession | null>(null);
@@ -42,12 +59,11 @@ export function Study() {
     setRevealed(false);
     const load = async () => {
       try {
-        const [profile, languages, resolvedTrack] = await Promise.all([
-          apiFetch<UserProfile>("/v1/me", { authenticated: true }),
+        const [code, languages, resolvedTrack] = await Promise.all([
+          loadMetaLanguage(),
           apiFetch<MetaLanguage[]>("/v1/languages/meta"),
           apiFetch<ResolvedTrack>("/v1/me/track", { authenticated: true }),
         ]);
-        const code = profile.preferences.meta_language ?? defaultMetaLanguage();
         const params = new URLSearchParams({ meta_language: code, direction });
         const next = await apiFetch<StudySession>(
           `/v1/tracks/${trackSlug}/units/${unitPosition}/items?${params}`,

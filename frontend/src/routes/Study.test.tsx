@@ -283,4 +283,37 @@ describe("Study", () => {
     expect(await screen.findByText(/you'll need a connection for this unit/i))
       .toBeInTheDocument();
   });
+
+  it("keeps a cached unit studyable when the uncached profile request fails offline", async () => {
+    Object.defineProperty(navigator, "onLine", {
+      configurable: true,
+      value: false,
+    });
+    localStorage.setItem("jale:meta-language", "eng");
+    vi.mocked(apiFetch).mockImplementation(async (path) => {
+      if (path === undefined) return {} as never;
+      if (path === "/v1/me") throw new TypeError("Failed to fetch");
+      if (path === "/v1/languages/meta")
+        return [{ code: "eng", name: "English" }] as never;
+      if (path === "/v1/me/track")
+        return { track: { name: "Igbo Foundations" } } as never;
+      if (String(path).includes("/items"))
+        return {
+          track: "foundations",
+          unit_position: 1,
+          unit_title: "Greetings",
+          mode: "flashcard",
+          items: [baseItem],
+        } as never;
+      throw new Error(`Unexpected ${path}`);
+    });
+    render(
+      <MemoryRouter initialEntries={["/study/foundations/1"]}>
+        <Routes>
+          <Route path="/study/:trackSlug/:unitPosition" element={<Study />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText("Ndewo")).toBeInTheDocument();
+  });
 });
