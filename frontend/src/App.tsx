@@ -2,6 +2,8 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 
 import { AuthProvider } from "./auth/AuthProvider";
 import { OfflineIndicator } from "./components/OfflineIndicator";
+import { PwaPrompts } from "./pwa/PwaPrompts";
+import { UpdatePrompt } from "./pwa/UpdatePrompt";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { OnboardingGuard } from "./auth/OnboardingGuard";
 import { AuthCallback } from "./routes/AuthCallback";
@@ -22,6 +24,8 @@ export function App() {
     <BrowserRouter>
       <AuthProvider>
         <OfflineIndicator />
+        <PwaPrompts />
+        <UpdatePrompt />
         <Routes>
           <Route path="/signin" element={<SignIn />} />
           <Route path="/auth/callback" element={<AuthCallback />} />

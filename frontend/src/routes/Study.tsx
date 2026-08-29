@@ -102,6 +102,8 @@ export function Study() {
       setShownAt(Date.now());
       setAdvancing(false);
     } else {
+      localStorage.setItem("jale:completed-study-session", "true");
+      window.dispatchEvent(new Event("jale:study-session-completed"));
       try {
         const result = await answerQueue.flush();
         setSummary(
