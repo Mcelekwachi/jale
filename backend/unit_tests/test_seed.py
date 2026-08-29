@@ -8,6 +8,43 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "db" / "seed"))
 import seed  # noqa: E402
 
 
+class ContentCursor:
+    def __init__(self):
+        self.calls = []
+        self.results = [None, {"was_insert": True}]
+
+    def execute(self, query, params):
+        self.calls.append((query, params))
+
+    def fetchone(self):
+        return self.results.pop(0)
+
+
+def test_upsert_content_populates_example_translation_without_blanking_existing_value():
+    cursor = ContentCursor()
+    rows = [
+        {
+            "source_key": "ibo:word:alphabet-a",
+            "content_type": "word",
+            "category_slug": "alphabet",
+            "difficulty": "beginner",
+            "target_text": "a",
+            "target_text_toned": "",
+            "example_sentence": "Aka",
+            "example_translation": "hand",
+        }
+    ]
+
+    seed.upsert_content(cursor, 1, None, {"alphabet": 2}, rows)
+
+    insert_query, insert_params = cursor.calls[1]
+    assert "example_translation" in insert_query
+    assert "example_translation = COALESCE(EXCLUDED.example_translation," in " ".join(
+        insert_query.split()
+    )
+    assert insert_params["example_translation"] == "hand"
+
+
 def test_unknown_translation_source_key_fails_preflight(tmp_path, monkeypatch):
     language_dir = tmp_path / "ibo"
     translations = language_dir / "translations"

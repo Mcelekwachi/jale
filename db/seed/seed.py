@@ -218,11 +218,13 @@ def upsert_content(cur, language_id, dialect_id, cat_ids, rows, position_start=0
                 source_key, language_id, dialect_id, category_id,
                 content_type, difficulty_level,
                 target_text, target_text_toned, example_sentence,
+                example_translation,
                 audio_url, audio_state, sort_order
             ) VALUES (
                 %(source_key)s, %(language_id)s, %(dialect_id)s, %(category_id)s,
                 %(content_type)s, %(difficulty)s,
                 %(target_text)s, %(toned)s, %(example)s,
+                %(example_translation)s,
                 %(audio_url)s, %(audio_state)s, %(sort_order)s
             )
             ON CONFLICT (source_key) DO UPDATE SET
@@ -230,6 +232,8 @@ def upsert_content(cur, language_id, dialect_id, cat_ids, rows, position_start=0
                 difficulty_level    = EXCLUDED.difficulty_level,
                 target_text         = EXCLUDED.target_text,
                 example_sentence    = EXCLUDED.example_sentence,
+                example_translation = COALESCE(EXCLUDED.example_translation,
+                                               content_items.example_translation),
                 sort_order          = EXCLUDED.sort_order,
                 -- tone marking and audio are contributor-owned once set:
                 -- the seed only fills them, never blanks them.
@@ -253,6 +257,7 @@ def upsert_content(cur, language_id, dialect_id, cat_ids, rows, position_start=0
                 "target_text": r["target_text"].strip(),
                 "toned": nullify(r.get("target_text_toned")),
                 "example": nullify(r.get("example_sentence")),
+                "example_translation": nullify(r.get("example_translation")),
                 "audio_url": nullify(r.get("audio_url")),
                 "audio_state": "missing",
                 "sort_order": position_start + offset,

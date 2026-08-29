@@ -41,17 +41,18 @@ tracks:
     rules:
       - { priority: 20, match_age: [child_u13] }
     units:
-      - { position: 1,  title: "Ekele — Saying Hello",  mode: flashcard, category: greetings,     content_type: word, item_count: 9 }
-      - { position: 2,  title: "Hello Game",            mode: quiz,      category: greetings,     content_type: word, item_count: 9 }
-      - { position: 3,  title: "Ọnụ Ọgụgụ — Numbers",   mode: flashcard, category: numbers,       content_type: word, item_count: 4 }
-      - { position: 4,  title: "Numbers Game",          mode: quiz,      category: numbers,       content_type: word, item_count: 4 }
-      - { position: 5,  title: "Ezinụlọ m — My Family", mode: flashcard, category: family_people, content_type: word, item_count: 7 }
-      - { position: 6,  title: "Family Game",           mode: quiz,      category: family_people, content_type: word, item_count: 7 }
-      - { position: 7,  title: "Ahụ m — My Body",       mode: flashcard, category: body,          content_type: word, item_count: 6 }
-      - { position: 8,  title: "Body Game",             mode: quiz,      category: body,          content_type: word, item_count: 6 }
-      - { position: 9,  title: "Anụmanụ — Animals",     mode: flashcard, category: animals,       content_type: word, item_count: 2 }
-      - { position: 10, title: "Nri na Mmiri",          mode: flashcard, category: food_market,   content_type: word, item_count: 3 }
-      - { position: 11, title: "Say It Out Loud",       mode: phrase_practice, category: greetings, content_type: phrase, item_count: 12 }
+      - { position: 1,  title: "Alphabet",              mode: flashcard, category: alphabet,      content_type: word, item_count: 36 }
+      - { position: 2,  title: "Ekele — Saying Hello",  mode: flashcard, category: greetings,     content_type: word, item_count: 9 }
+      - { position: 3,  title: "Hello Game",            mode: quiz,      category: greetings,     content_type: word, item_count: 9 }
+      - { position: 4,  title: "Ọnụ Ọgụgụ — Numbers",   mode: flashcard, category: numbers,       content_type: word, item_count: 4 }
+      - { position: 5,  title: "Numbers Game",          mode: quiz,      category: numbers,       content_type: word, item_count: 4 }
+      - { position: 6,  title: "Ezinụlọ m — My Family", mode: flashcard, category: family_people, content_type: word, item_count: 7 }
+      - { position: 7,  title: "Family Game",           mode: quiz,      category: family_people, content_type: word, item_count: 7 }
+      - { position: 8,  title: "Ahụ m — My Body",       mode: flashcard, category: body,          content_type: word, item_count: 6 }
+      - { position: 9,  title: "Body Game",             mode: quiz,      category: body,          content_type: word, item_count: 6 }
+      - { position: 10, title: "Anụmanụ — Animals",     mode: flashcard, category: animals,       content_type: word, item_count: 2 }
+      - { position: 11, title: "Nri na Mmiri",          mode: flashcard, category: food_market,   content_type: word, item_count: 3 }
+      - { position: 12, title: "Say It Out Loud",       mode: phrase_practice, category: greetings, content_type: phrase, item_count: 12 }
 
   # ------------------------------------------------------- heritage speaker
   - slug: ibo_heritage_structured
@@ -127,14 +128,15 @@ tracks:
     rules:
       - { priority: 999 }          # wildcard — matches anyone unmatched above
     units:
-      - { position: 1,  title: "Greetings & Courtesy",   mode: flashcard,       category: greetings,      content_type: word,   item_count: 9 }
-      - { position: 2,  title: "Greetings Quiz",         mode: quiz,            category: greetings,      content_type: word,   item_count: 9 }
-      - { position: 3,  title: "Your First Phrases",     mode: phrase_practice, category: greetings,      content_type: phrase, item_count: 12 }
-      - { position: 4,  title: "Family & People",        mode: flashcard,       category: family_people,  content_type: word,   item_count: 7 }
-      - { position: 5,  title: "Numbers",                mode: flashcard,       category: numbers,        content_type: word,   item_count: 4 }
-      - { position: 6,  title: "The Body",               mode: flashcard,       category: body,           content_type: word,   item_count: 6 }
-      - { position: 7,  title: "Everyday Conversation",  mode: phrase_practice, category: conversation,   content_type: phrase, item_count: 12 }
-      - { position: 8,  title: "Time & Days",            mode: flashcard,       category: time_days,      content_type: word,   item_count: 7 }
-      - { position: 9,  title: "Common Commands",        mode: phrase_practice, category: everyday_verbs, content_type: phrase, item_count: 9 }
-      - { position: 10, title: "Asking for Help",        mode: phrase_practice, category: help_language,  content_type: phrase, item_count: 7 }
-      - { position: 11, title: "Your First Proverbs",    mode: proverbs,        category: proverbs_unity, content_type: proverb, item_count: 7 }
+      - { position: 1,  title: "Alphabet",                mode: flashcard,       category: alphabet,       content_type: word,   item_count: 36 }
+      - { position: 2,  title: "Greetings & Courtesy",   mode: flashcard,       category: greetings,      content_type: word,   item_count: 9 }
+      - { position: 3,  title: "Greetings Quiz",         mode: quiz,            category: greetings,      content_type: word,   item_count: 9 }
+      - { position: 4,  title: "Your First Phrases",     mode: phrase_practice, category: greetings,      content_type: phrase, item_count: 12 }
+      - { position: 5,  title: "Family & People",        mode: flashcard,       category: family_people,  content_type: word,   item_count: 7 }
+      - { position: 6,  title: "Numbers",                mode: flashcard,       category: numbers,        content_type: word,   item_count: 4 }
+      - { position: 7,  title: "The Body",               mode: flashcard,       category: body,           content_type: word,   item_count: 6 }
+      - { position: 8,  title: "Everyday Conversation",  mode: phrase_practice, category: conversation,   content_type: phrase, item_count: 12 }
+      - { position: 9,  title: "Time & Days",            mode: flashcard,       category: time_days,      content_type: word,   item_count: 7 }
+      - { position: 10, title: "Common Commands",        mode: phrase_practice, category: everyday_verbs, content_type: phrase, item_count: 9 }
+      - { position: 11, title: "Asking for Help",        mode: phrase_practice, category: help_language,  content_type: phrase, item_count: 7 }
+      - { position: 12, title: "Your First Proverbs",    mode: proverbs,        category: proverbs_unity, content_type: proverb, item_count: 7 }
