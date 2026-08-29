@@ -38,7 +38,10 @@ const track = {
 };
 
 describe("Home", () => {
-  beforeEach(() => vi.mocked(apiFetch).mockReset());
+  beforeEach(() => {
+    vi.mocked(apiFetch).mockReset();
+    Object.defineProperty(navigator, "share", { configurable: true, value: undefined });
+  });
 
   it("shows track, due review, progress, and disables unavailable units", async () => {
     vi.mocked(apiFetch)
@@ -138,5 +141,26 @@ describe("Home", () => {
     expect(share).toHaveBeenCalledWith(expect.objectContaining({
       url: `${window.location.origin}/u/ada-learner`,
     }));
+  });
+
+  it("copies the public progress URL when Web Share is unavailable", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    vi.mocked(apiFetch)
+      .mockResolvedValueOnce(track as never)
+      .mockResolvedValueOnce({ current_streak: 3, today_goal_met: true } as never)
+      .mockResolvedValueOnce({ items: [] } as never)
+      .mockResolvedValueOnce({
+        share_slug: "ada-learner",
+        preferences: { meta_language: "eng" },
+      } as never)
+      .mockResolvedValueOnce([{ code: "eng", name: "English" }] as never);
+    render(<Home />, { wrapper: MemoryRouter });
+    await userEvent.click(await screen.findByRole("button", { name: /share my progress/i }));
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/u/ada-learner`);
+    expect(await screen.findByRole("status")).toHaveTextContent(/link copied/i);
   });
 });
