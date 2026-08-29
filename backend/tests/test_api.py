@@ -109,7 +109,7 @@ async def test_health_db_reports_seeded_content(client):
     assert r.status_code == 200
     body = r.json()
     assert body["status"] == "ok"
-    assert body["content_items"] == 205
+    assert body["content_items"] == 211
     assert body["tracks"] == 6
     assert body["learnable_languages"] == 1
     assert "active_languages" not in body
@@ -131,11 +131,11 @@ async def test_meta_language_coverage_reports_seeded_dutch_words_and_phrases(cli
     languages = {language["code"]: language for language in r.json()}
     assert set(languages) == {"eng", "nld"}
     assert languages["eng"]["is_active"] is True
-    assert languages["eng"]["translated_count"] == 205
-    assert languages["eng"]["total_count"] == 205
+    assert languages["eng"]["translated_count"] == 211
+    assert languages["eng"]["total_count"] == 211
     assert languages["nld"]["is_active"] is True
     assert languages["nld"]["translated_count"] == 107
-    assert languages["nld"]["total_count"] == 205
+    assert languages["nld"]["total_count"] == 211
 
 
 async def test_language_catalogue_returns_roadmap_and_coverage_without_authentication(client):
@@ -148,13 +148,13 @@ async def test_language_catalogue_returns_roadmap_and_coverage_without_authentic
     learnable = {language["code"]: language for language in catalogue["learnable"]}
     meta = {language["code"]: language for language in catalogue["meta"]}
     assert learnable["ibo"]["available"] is True
-    assert learnable["ibo"]["content_count"] == 205
+    assert learnable["ibo"]["content_count"] == 211
     assert learnable["ibo"]["endonym"] == "Asụsụ Igbo"
     assert learnable["yor"]["available"] is False
     assert learnable["yor"]["content_count"] == 0
     assert meta["nld"]["available"] is True
     assert meta["nld"]["translated_count"] == 107
-    assert meta["nld"]["total_count"] == 205
+    assert meta["nld"]["total_count"] == 211
 
 
 async def test_existing_language_endpoints_keep_their_shapes(client):
@@ -208,7 +208,7 @@ async def test_unknown_language_is_404(client):
 
 
 async def test_content_totals_by_type(client):
-    expected = {"word": 105, "phrase": 50, "proverb": 50}
+    expected = {"word": 111, "phrase": 50, "proverb": 50}
     for content_type, count in expected.items():
         r = await client.get(
             "/v1/content", params={"language": "ibo", "content_type": content_type}
@@ -221,7 +221,7 @@ async def test_content_paging(client):
     r = await client.get("/v1/content", params={"language": "ibo", "limit": 10, "offset": 0})
     first = r.json()
     assert len(first["items"]) == 10
-    assert first["total"] == 205
+    assert first["total"] == 211
 
     r = await client.get("/v1/content", params={"language": "ibo", "limit": 10, "offset": 10})
     second = r.json()
@@ -358,7 +358,7 @@ async def test_seeded_translation_counts(database_url):
             """
         ).fetchall()
 
-    assert dict(rows) == {"eng": 205, "nld": 107}
+    assert dict(rows) == {"eng": 211, "nld": 107}
 
 
 async def test_meta_language_coverage_counts_only_published_content(client, database_url):
@@ -406,7 +406,7 @@ async def test_meta_language_coverage_counts_only_published_content(client, data
             assert r.status_code == 200
             dutch = next(row for row in r.json() if row["code"] == "nld")
             assert dutch["translated_count"] == 108
-            assert dutch["total_count"] == 205
+            assert dutch["total_count"] == 211
         finally:
             if draft_id is not None:
                 conn.execute("DELETE FROM content_items WHERE id = %s", (draft_id,))

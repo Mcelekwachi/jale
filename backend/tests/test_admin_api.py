@@ -537,13 +537,14 @@ async def test_admin_content_detail_returns_404_for_unknown_item(
         assert response.status_code == 404
 
 
-async def test_missing_dutch_translation_filter_returns_the_fifty_proverbs(
+async def test_missing_dutch_translation_filter_can_be_scoped_to_proverbs(
     client, database_url, auth_headers
 ):
     admin_id, admin_headers = await provision_admin(client, database_url, auth_headers)
     with isolated_test_users(admin_id):
         response = await client.get(
-            "/v1/admin/content?missing_translation=nld&limit=100", headers=admin_headers
+            "/v1/admin/content?content_type=proverb&missing_translation=nld&limit=100",
+            headers=admin_headers,
         )
 
         assert response.status_code == 200
