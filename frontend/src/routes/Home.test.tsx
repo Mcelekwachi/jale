@@ -119,4 +119,24 @@ describe("Home", () => {
     await userEvent.click(screen.getByRole("button", { name: /sync now/i }));
     expect(await screen.findByText(/all answers synced/i)).toBeInTheDocument();
   });
+
+  it("shares the learner's public progress URL", async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "share", { configurable: true, value: share });
+    vi.mocked(apiFetch)
+      .mockResolvedValueOnce(track as never)
+      .mockResolvedValueOnce({ current_streak: 3, today_goal_met: true } as never)
+      .mockResolvedValueOnce({ items: [] } as never)
+      .mockResolvedValueOnce({
+        display_name: "Ada",
+        share_slug: "ada-learner",
+        preferences: { meta_language: "eng" },
+      } as never)
+      .mockResolvedValueOnce([{ code: "eng", name: "English" }] as never);
+    render(<Home />, { wrapper: MemoryRouter });
+    await userEvent.click(await screen.findByRole("button", { name: /share my progress/i }));
+    expect(share).toHaveBeenCalledWith(expect.objectContaining({
+      url: `${window.location.origin}/u/ada-learner`,
+    }));
+  });
 });

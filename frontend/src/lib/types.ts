@@ -245,6 +245,15 @@ export interface UserProfile {
   preferences: UserPreferences;
 }
 
+export interface PublicProfileSummary {
+  display_name: string | null;
+  current_streak: number;
+  longest_streak: number;
+  total_mastered: number;
+  language: string;
+  joined_month: string;
+}
+
 export interface MetaLanguage {
   code: string;
   name: string;

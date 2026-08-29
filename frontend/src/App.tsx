@@ -18,6 +18,7 @@ import { NotFound } from "./routes/NotFound";
 import { Settings } from "./routes/Settings";
 import { SignIn } from "./routes/SignIn";
 import { Study } from "./routes/Study";
+import { PublicProfile } from "./routes/PublicProfile";
 
 export function App() {
   return (
@@ -29,6 +30,7 @@ export function App() {
         <Routes>
           <Route path="/signin" element={<SignIn />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/u/:shareSlug" element={<PublicProfile />} />
           <Route element={<ProtectedRoute />}>
             <Route
               path="/admin"

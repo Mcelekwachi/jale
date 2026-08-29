@@ -32,6 +32,7 @@ export function Home() {
   const [pendingAnswers, setPendingAnswers] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [syncComplete, setSyncComplete] = useState(false);
+  const [shareMessage, setShareMessage] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
     const update = () =>
@@ -115,6 +116,30 @@ export function Home() {
               ? "✓ Today's goal met"
               : "Keep going to meet today's goal"}
           </p>
+          {profile.share_slug && (
+            <button
+              type="button"
+              className="mt-5 min-h-11 rounded-xl bg-cream px-5 font-bold text-indigo-deep"
+              onClick={() => {
+                const url = `${window.location.origin}/u/${profile.share_slug}`;
+                const shareData = {
+                  title: "My Jalɛ progress",
+                  text: `${profile.display_name || "A Jalɛ learner"}'s learning progress`,
+                  url,
+                };
+                if (navigator.share) {
+                  void navigator.share(shareData);
+                } else {
+                  void navigator.clipboard.writeText(url).then(() =>
+                    setShareMessage("Profile link copied"),
+                  );
+                }
+              }}
+            >
+              Share my progress
+            </button>
+          )}
+          {shareMessage && <p role="status" className="mt-3 text-sm text-lavender">{shareMessage}</p>}
         </section>
         {(pendingAnswers > 0 || syncComplete) && (
           <section className="flex min-h-14 items-center justify-between gap-4 rounded-2xl bg-ochre-soft px-5 text-indigo-deep">
