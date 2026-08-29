@@ -81,9 +81,9 @@ ibo:word:alphabet-nw,word,alphabet,beginner,nw,,Nwa,child
 ibo:word:alphabet-ny,word,alphabet,beginner,ny,,Nye,give
 ibo:word:alphabet-o,word,alphabet,beginner,o,,Onye,person
 ibo:word:alphabet-oo-dot,word,alphabet,beginner,ọ,,Ọcha,white
-ibo:word:alphabet-p,word,alphabet,beginner,p,,,
+ibo:word:alphabet-p,word,alphabet,beginner,p,,Puku,thousand
 ibo:word:alphabet-r,word,alphabet,beginner,r,,Rie,eat
-ibo:word:alphabet-s,word,alphabet,beginner,s,,,
+ibo:word:alphabet-s,word,alphabet,beginner,s,,Süö,speak
 ibo:word:alphabet-sh,word,alphabet,beginner,sh,,,
 ibo:word:alphabet-t,word,alphabet,beginner,t,,Taa,today
 ibo:word:alphabet-u,word,alphabet,beginner,u,,Uwe,cloth
@@ -110,3 +110,5 @@ ibo:word:uwe,word,daily_life,beginner,Uwe,
 ibo:word:zuo,word,shopping_money,beginner,Zụọ,
 ibo:word:ocha,word,daily_life,beginner,Ọcha,
 ibo:word:weta,word,everyday_verbs,beginner,Weta,
+ibo:word:puku,word,numbers,beginner,Puku,
+ibo:word:suo,word,everyday_verbs,beginner,Süö,

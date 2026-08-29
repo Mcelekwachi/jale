@@ -12,7 +12,7 @@ import psycopg
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CURRENT_SCHEMA = REPO_ROOT / "db" / "schema.sql"
-EXPECTED_COUNTS = (211, 318, 6)
+EXPECTED_COUNTS = (213, 320, 6)
 EXPECTED_ADMIN_VIEW_COLUMNS = (
     "content_id",
     "language",
