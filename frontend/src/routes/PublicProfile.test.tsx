@@ -25,6 +25,8 @@ describe("PublicProfile", () => {
       longest_streak: 19,
       total_mastered: 42,
       language: "ibo",
+      language_name: "Igbo",
+      language_endonym: "Asụsụ Igbo",
       joined_month: "2024-03",
     };
     vi.mocked(apiFetch).mockResolvedValue(response);
@@ -36,13 +38,18 @@ describe("PublicProfile", () => {
     expect(screen.getByText(/7 day current streak/i)).toBeInTheDocument();
     expect(screen.getByText(/19 day longest streak/i)).toBeInTheDocument();
     expect(screen.getByText(/42 mastered/i)).toBeInTheDocument();
-    expect(screen.getByText(/learning IBO/i)).toBeInTheDocument();
+    expect(screen.getByText(/learning Igbo \(Asụsụ Igbo\)/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText(new RegExp(`\\b${response.language.toUpperCase()}\\b`)),
+    ).not.toBeInTheDocument();
     expect(screen.getByText(/joined March 2024/i)).toBeInTheDocument();
     expect(Object.keys(response).sort()).toEqual([
       "current_streak",
       "display_name",
       "joined_month",
       "language",
+      "language_endonym",
+      "language_name",
       "longest_streak",
       "total_mastered",
     ]);

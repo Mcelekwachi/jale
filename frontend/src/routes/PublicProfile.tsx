@@ -59,7 +59,10 @@ export function PublicProfile() {
       <section className="mx-auto max-w-lg rounded-[2rem] bg-cream p-8 shadow-card">
         <p className="font-display text-2xl font-bold text-indigo-deep">Jalɛ</p>
         <h1 className="mt-8 font-display text-4xl text-indigo-deep">{profile.display_name || "Jalɛ learner"}</h1>
-        <p className="mt-2 text-muted">Learning {profile.language.toUpperCase()} · Joined {joinedLabel(profile.joined_month)}</p>
+        <p className="mt-2 text-muted">
+          Learning {profile.language_name}
+          {profile.language_endonym ? ` (${profile.language_endonym})` : ""} · Joined {joinedLabel(profile.joined_month)}
+        </p>
         <dl className="mt-8 grid gap-3 sm:grid-cols-3">
           <div className="rounded-2xl bg-ochre-soft p-4"><dt className="text-sm">Current</dt><dd className="mt-1 font-display text-2xl font-bold">{profile.current_streak} day current streak</dd></div>
           <div className="rounded-2xl bg-ochre-soft p-4"><dt className="text-sm">Personal best</dt><dd className="mt-1 font-display text-2xl font-bold">{profile.longest_streak} day longest streak</dd></div>

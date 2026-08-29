@@ -251,6 +251,8 @@ export interface PublicProfileSummary {
   longest_streak: number;
   total_mastered: number;
   language: string;
+  language_name: string;
+  language_endonym: string | null;
   joined_month: string;
 }
 
