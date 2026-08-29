@@ -88,6 +88,13 @@ def assert_well_formed_quiz_options(item: dict) -> None:
     assert correct[0]["text"] == item["answer"]
 
 
+async def unit_items_path(client, track_slug: str, unit_title: str) -> str:
+    response = await client.get(f"/v1/tracks/{track_slug}")
+    assert response.status_code == 200
+    unit = next(unit for unit in response.json()["units"] if unit["title"] == unit_title)
+    return f"/v1/tracks/{track_slug}/units/{unit['position']}/items"
+
+
 # --- health -----------------------------------------------------------------
 
 
@@ -102,7 +109,7 @@ async def test_health_db_reports_seeded_content(client):
     assert r.status_code == 200
     body = r.json()
     assert body["status"] == "ok"
-    assert body["content_items"] == 157
+    assert body["content_items"] == 205
     assert body["tracks"] == 6
     assert body["learnable_languages"] == 1
     assert "active_languages" not in body
@@ -124,11 +131,11 @@ async def test_meta_language_coverage_reports_seeded_dutch_words_and_phrases(cli
     languages = {language["code"]: language for language in r.json()}
     assert set(languages) == {"eng", "nld"}
     assert languages["eng"]["is_active"] is True
-    assert languages["eng"]["translated_count"] == 157
-    assert languages["eng"]["total_count"] == 157
+    assert languages["eng"]["translated_count"] == 205
+    assert languages["eng"]["total_count"] == 205
     assert languages["nld"]["is_active"] is True
     assert languages["nld"]["translated_count"] == 107
-    assert languages["nld"]["total_count"] == 157
+    assert languages["nld"]["total_count"] == 205
 
 
 async def test_language_catalogue_returns_roadmap_and_coverage_without_authentication(client):
@@ -141,13 +148,13 @@ async def test_language_catalogue_returns_roadmap_and_coverage_without_authentic
     learnable = {language["code"]: language for language in catalogue["learnable"]}
     meta = {language["code"]: language for language in catalogue["meta"]}
     assert learnable["ibo"]["available"] is True
-    assert learnable["ibo"]["content_count"] == 157
+    assert learnable["ibo"]["content_count"] == 205
     assert learnable["ibo"]["endonym"] == "Asụsụ Igbo"
     assert learnable["yor"]["available"] is False
     assert learnable["yor"]["content_count"] == 0
     assert meta["nld"]["available"] is True
     assert meta["nld"]["translated_count"] == 107
-    assert meta["nld"]["total_count"] == 157
+    assert meta["nld"]["total_count"] == 205
 
 
 async def test_existing_language_endpoints_keep_their_shapes(client):
@@ -201,7 +208,7 @@ async def test_unknown_language_is_404(client):
 
 
 async def test_content_totals_by_type(client):
-    expected = {"word": 57, "phrase": 50, "proverb": 50}
+    expected = {"word": 105, "phrase": 50, "proverb": 50}
     for content_type, count in expected.items():
         r = await client.get(
             "/v1/content", params={"language": "ibo", "content_type": content_type}
@@ -214,7 +221,7 @@ async def test_content_paging(client):
     r = await client.get("/v1/content", params={"language": "ibo", "limit": 10, "offset": 0})
     first = r.json()
     assert len(first["items"]) == 10
-    assert first["total"] == 157
+    assert first["total"] == 205
 
     r = await client.get("/v1/content", params={"language": "ibo", "limit": 10, "offset": 10})
     second = r.json()
@@ -272,7 +279,7 @@ async def test_seeded_dutch_translations_produce_a_mixed_page(client):
     assert response.status_code == 200
     items = response.json()["items"]
     assert sum(item["meta_language_used"] == "nld" for item in items) == 107
-    assert sum(item["meta_language_used"] == "eng" for item in items) == 50
+    assert sum(item["meta_language_used"] == "eng" for item in items) == 93
 
 
 async def test_requested_translation_falls_back_each_optional_field_independently(
@@ -351,7 +358,7 @@ async def test_seeded_translation_counts(database_url):
             """
         ).fetchall()
 
-    assert dict(rows) == {"eng": 157, "nld": 107}
+    assert dict(rows) == {"eng": 205, "nld": 107}
 
 
 async def test_meta_language_coverage_counts_only_published_content(client, database_url):
@@ -399,7 +406,7 @@ async def test_meta_language_coverage_counts_only_published_content(client, data
             assert r.status_code == 200
             dutch = next(row for row in r.json() if row["code"] == "nld")
             assert dutch["translated_count"] == 108
-            assert dutch["total_count"] == 157
+            assert dutch["total_count"] == 205
         finally:
             if draft_id is not None:
                 conn.execute("DELETE FROM content_items WHERE id = %s", (draft_id,))
@@ -654,7 +661,8 @@ async def test_every_track_unit_has_content(client):
 
 
 async def test_flashcard_session_shape(client):
-    r = await client.get("/v1/tracks/ibo_foundations/units/1/items")
+    path = await unit_items_path(client, "ibo_foundations", "Greetings & Courtesy")
+    r = await client.get(path)
     assert r.status_code == 200
     body = r.json()
     assert body["mode"] == "flashcard"
@@ -667,10 +675,11 @@ async def test_flashcard_session_shape(client):
 async def test_study_direction_defaults_to_target_then_swaps_prompt_and_answer(
     client, database_url
 ):
+    path = await unit_items_path(client, "ibo_foundations", "Greetings & Courtesy")
     params = {"meta_language": "nld", "shuffle_seed": 17}
-    default = await client.get("/v1/tracks/ibo_foundations/units/1/items", params=params)
+    default = await client.get(path, params=params)
     reverse = await client.get(
-        "/v1/tracks/ibo_foundations/units/1/items",
+        path,
         params={**params, "direction": "meta_to_target"},
     )
     assert default.status_code == reverse.status_code == 200
@@ -704,7 +713,8 @@ async def test_study_direction_defaults_to_target_then_swaps_prompt_and_answer(
 
 
 async def test_quiz_session_has_four_distinct_options_with_one_correct(client):
-    r = await client.get("/v1/tracks/ibo_foundations/units/2/items", params={"shuffle_seed": 7})
+    path = await unit_items_path(client, "ibo_foundations", "Greetings Quiz")
+    r = await client.get(path, params={"shuffle_seed": 7})
     body = r.json()
     assert body["mode"] == "quiz"
     for item in body["items"]:
@@ -712,7 +722,7 @@ async def test_quiz_session_has_four_distinct_options_with_one_correct(client):
 
 
 async def test_quiz_options_follow_answer_side_for_seeded_dutch(client, database_url):
-    path = "/v1/tracks/ibo_foundations/units/2/items"
+    path = await unit_items_path(client, "ibo_foundations", "Greetings Quiz")
     with db_connection(database_url) as conn:
         dutch_texts = {
             row[0]
@@ -775,20 +785,22 @@ async def test_proverb_session_returns_the_cultural_lesson(client):
 
 
 async def test_phrase_practice_session(client):
-    r = await client.get("/v1/tracks/ibo_foundations/units/3/items")
+    path = await unit_items_path(client, "ibo_foundations", "Your First Phrases")
+    r = await client.get(path)
     body = r.json()
     assert body["mode"] == "phrase_practice"
     assert all(i["content_type"] == "phrase" for i in body["items"])
 
 
 async def test_shuffle_seed_is_reproducible(client):
-    a = await client.get("/v1/tracks/ibo_foundations/units/1/items", params={"shuffle_seed": 42})
-    b = await client.get("/v1/tracks/ibo_foundations/units/1/items", params={"shuffle_seed": 42})
+    path = await unit_items_path(client, "ibo_foundations", "Alphabet")
+    a = await client.get(path, params={"shuffle_seed": 42})
+    b = await client.get(path, params={"shuffle_seed": 42})
     assert [i["id"] for i in a.json()["items"]] == [i["id"] for i in b.json()["items"]]
 
 
 async def test_quiz_shuffle_seed_reproduces_item_and_option_order(client):
-    path = "/v1/tracks/ibo_foundations/units/2/items"
+    path = await unit_items_path(client, "ibo_foundations", "Greetings Quiz")
     params = {
         "meta_language": "nld",
         "direction": "target_to_meta",
@@ -812,7 +824,8 @@ async def test_unknown_unit_is_404(client):
 
 async def test_every_item_has_a_flag_target_and_audio_field(client):
     """Flag button and audio button ship with the first mode, not later."""
-    r = await client.get("/v1/tracks/ibo_foundations/units/1/items")
+    path = await unit_items_path(client, "ibo_foundations", "Alphabet")
+    r = await client.get(path)
     for item in r.json()["items"]:
         assert "id" in item and "flag_count" in item
         assert "audio_url" in item and "audio_state" in item
