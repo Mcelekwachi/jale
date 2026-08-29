@@ -16,6 +16,8 @@ PUBLIC_PROFILE_FIELDS = {
     "longest_streak",
     "total_mastered",
     "language",
+    "language_name",
+    "language_endonym",
     "joined_month",
 }
 
@@ -76,6 +78,8 @@ async def test_public_profile_returns_only_privacy_safe_summary(
             "longest_streak": 19,
             "total_mastered": 42,
             "language": "ibo",
+            "language_name": "Igbo",
+            "language_endonym": "Asụsụ Igbo",
             "joined_month": "2024-03",
         }
         assert set(response.json()) == PUBLIC_PROFILE_FIELDS

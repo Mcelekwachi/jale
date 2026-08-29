@@ -339,6 +339,8 @@ class PublicProfile(BaseModel):
     longest_streak: int
     total_mastered: int
     language: str
+    language_name: str
+    language_endonym: str | None
     joined_month: str = Field(pattern=r"^\d{4}-\d{2}$")
 
 
