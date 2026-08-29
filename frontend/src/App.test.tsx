@@ -126,4 +126,16 @@ describe("App admin route", () => {
       "/",
     );
   });
+
+  it("shows a non-blocking offline indicator", () => {
+    Object.defineProperty(navigator, "onLine", {
+      configurable: true,
+      value: false,
+    });
+    window.history.replaceState({}, "", "/definitely-not-a-route");
+
+    render(<App />);
+
+    expect(screen.getByRole("status", { name: /offline/i })).toBeInTheDocument();
+  });
 });

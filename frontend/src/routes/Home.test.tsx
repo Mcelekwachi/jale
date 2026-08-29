@@ -1,8 +1,10 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { apiFetch } from "../lib/api";
+import { answerQueue } from "../study/answerQueueService";
 import { Home } from "./Home";
 
 vi.mock("../auth/useAuth", () => ({ useAuth: () => ({ signOut: vi.fn() }) }));
@@ -85,5 +87,36 @@ describe("Home", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText(/0 day streak/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/review due/i)).not.toBeInTheDocument();
+  });
+
+  it("shows queued answers and lets the learner sync them", async () => {
+    await answerQueue.add({
+      content_id: 7,
+      correct: true,
+      mode: "flashcard",
+      duration_ms: 42,
+    });
+    const [pending] = await answerQueue.list();
+    vi.mocked(apiFetch)
+      .mockResolvedValueOnce(track as never)
+      .mockResolvedValueOnce({ current_streak: 1, today_goal_met: true } as never)
+      .mockResolvedValueOnce({ items: [] } as never)
+      .mockResolvedValueOnce({ preferences: { meta_language: "eng" } } as never)
+      .mockResolvedValueOnce([{ code: "eng", name: "English" }] as never)
+      .mockResolvedValueOnce({
+        results: [{
+          content_id: 7,
+          client_answer_id: pending.client_answer_id,
+          status: "accepted",
+        }],
+        current_streak: 1,
+        today_xp: 1,
+      } as never);
+
+    render(<Home />, { wrapper: MemoryRouter });
+
+    expect(await screen.findByText(/1 pending answer/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /sync now/i }));
+    expect(await screen.findByText(/all answers synced/i)).toBeInTheDocument();
   });
 });

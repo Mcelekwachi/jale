@@ -172,4 +172,24 @@ describe("SignIn", () => {
     ).toBeInTheDocument();
     expect(screen.queryByLabelText(/password/i)).not.toBeInTheDocument();
   });
+
+  it("explains that sign-in needs a connection when offline", async () => {
+    Object.defineProperty(navigator, "onLine", {
+      configurable: true,
+      value: false,
+    });
+    const signInWithEmail = vi.fn();
+    mockedUseAuth.mockReturnValue(authValue({ signInWithEmail }));
+    render(
+      <MemoryRouter>
+        <SignIn />
+      </MemoryRouter>,
+    );
+    await userEvent.type(screen.getByLabelText(/email/i), "ada@example.com");
+    await userEvent.click(screen.getByRole("button", { name: /send magic link/i }));
+
+    expect(screen.getByText(/sign-in requires an internet connection/i))
+      .toBeInTheDocument();
+    expect(signInWithEmail).not.toHaveBeenCalled();
+  });
 });

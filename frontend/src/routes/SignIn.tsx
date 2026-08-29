@@ -37,6 +37,10 @@ export function SignIn() {
 
   async function sendMagicLink(event: FormEvent) {
     event.preventDefault();
+    if (!navigator.onLine) {
+      setError("Sign-in requires an internet connection.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -67,6 +71,10 @@ export function SignIn() {
 
   async function submitPassword(event: FormEvent) {
     event.preventDefault();
+    if (!navigator.onLine) {
+      setError("Sign-in requires an internet connection.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -92,6 +100,10 @@ export function SignIn() {
   const googleEnabled = import.meta.env.VITE_GOOGLE_ENABLED === "true";
 
   async function continueWithGoogle() {
+    if (!navigator.onLine) {
+      setError("Sign-in requires an internet connection.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
