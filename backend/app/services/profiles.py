@@ -10,6 +10,8 @@ SELECT u.display_name,
        stats.longest_streak,
        stats.total_mastered,
        language.code AS language,
+       language.name AS language_name,
+       language.endonym AS language_endonym,
        to_char(u.created_at AT TIME ZONE 'UTC', 'YYYY-MM') AS joined_month
   FROM app_users u
   JOIN user_stats stats ON stats.user_id=u.id
