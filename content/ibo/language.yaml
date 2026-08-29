@@ -29,6 +29,7 @@ tone_policy:
 
 categories:
   # --- vocabulary & phrases -------------------------------------------
+  - { slug: alphabet,       name: "Alphabet",                 icon: "text",     sort_order: 5 }
   - { slug: greetings,      name: "Greetings & Courtesy",     icon: "wave",     sort_order: 10 }
   - { slug: conversation,   name: "Everyday Conversation",    icon: "chat",     sort_order: 20 }
   - { slug: family_people,  name: "Family & People",          icon: "family",   sort_order: 30 }

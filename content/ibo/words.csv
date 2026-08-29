@@ -1,4 +1,4 @@
-source_key,content_type,category_slug,difficulty,target_text,target_text_toned
+source_key,content_type,category_slug,difficulty,target_text,target_text_toned,example_sentence,example_translation
 ibo:word:ndewo,word,greetings,beginner,Ndewo,
 ibo:word:daalu,word,greetings,beginner,Daalụ,
 ibo:word:biko,word,greetings,beginner,Biko,
@@ -56,3 +56,51 @@ ibo:word:agu,word,animals,beginner,Agụ,
 ibo:word:ewu,word,animals,beginner,Ewu,
 ibo:word:uloogwu,word,health,beginner,Ụlọọgwụ,
 ibo:word:ogwu,word,health,beginner,Ọgwụ,
+ibo:word:alphabet-a,word,alphabet,beginner,a,,Aka,hand
+ibo:word:alphabet-b,word,alphabet,beginner,b,,Bịa,come
+ibo:word:alphabet-ch,word,alphabet,beginner,ch,,Chi,God
+ibo:word:alphabet-d,word,alphabet,beginner,d,,Dee,write
+ibo:word:alphabet-e,word,alphabet,beginner,e,,Ewu,goat
+ibo:word:alphabet-f,word,alphabet,beginner,f,,,
+ibo:word:alphabet-g,word,alphabet,beginner,g,,Gaa,go
+ibo:word:alphabet-gb,word,alphabet,beginner,gb,,Gbur gburugburu,round
+ibo:word:alphabet-gh,word,alphabet,beginner,gh,,Agha,war
+ibo:word:alphabet-gw,word,alphabet,beginner,gw,,Gwa,told
+ibo:word:alphabet-h,word,alphabet,beginner,h,,Hapụ,leave / let go
+ibo:word:alphabet-i,word,alphabet,beginner,i,,Isi,head
+ibo:word:alphabet-ii-dot,word,alphabet,beginner,ị,,Ịsị,smell
+ibo:word:alphabet-j,word,alphabet,beginner,j,,Juo,ask
+ibo:word:alphabet-k,word,alphabet,beginner,k,,Kele,greet
+ibo:word:alphabet-kp,word,alphabet,beginner,kp,,,
+ibo:word:alphabet-kw,word,alphabet,beginner,kw,,Kwere,agree
+ibo:word:alphabet-l,word,alphabet,beginner,l,,,
+ibo:word:alphabet-m,word,alphabet,beginner,m,,Mmiri,water
+ibo:word:alphabet-n,word,alphabet,beginner,n,,Nne,mother
+ibo:word:alphabet-n-dot,word,alphabet,beginner,ṅ,,,
+ibo:word:alphabet-nw,word,alphabet,beginner,nw,,Nwa,child
+ibo:word:alphabet-ny,word,alphabet,beginner,ny,,Nye,give
+ibo:word:alphabet-o,word,alphabet,beginner,o,,Ọrụ,work
+ibo:word:alphabet-oo-dot,word,alphabet,beginner,ọ,,,
+ibo:word:alphabet-p,word,alphabet,beginner,p,,,
+ibo:word:alphabet-r,word,alphabet,beginner,r,,Rie,eat
+ibo:word:alphabet-s,word,alphabet,beginner,s,,,
+ibo:word:alphabet-sh,word,alphabet,beginner,sh,,,
+ibo:word:alphabet-t,word,alphabet,beginner,t,,Taa,today
+ibo:word:alphabet-u,word,alphabet,beginner,u,,,
+ibo:word:alphabet-uu-dot,word,alphabet,beginner,ụ,,Ụlọ,house
+ibo:word:alphabet-v,word,alphabet,beginner,v,,,
+ibo:word:alphabet-w,word,alphabet,beginner,w,,,
+ibo:word:alphabet-y,word,alphabet,beginner,y,,,
+ibo:word:alphabet-z,word,alphabet,beginner,z,,,
+ibo:word:chi,word,everyday_verbs,beginner,Chi,
+ibo:word:dee,word,everyday_verbs,beginner,Dee,
+ibo:word:gwa,word,everyday_verbs,beginner,Gwa,
+ibo:word:gwoo,word,health,beginner,Gwoo,
+ibo:word:juo,word,everyday_verbs,beginner,Juo,
+ibo:word:kele,word,greetings,beginner,Kele,
+ibo:word:kwere,word,everyday_verbs,beginner,Kwere,
+ibo:word:nye,word,everyday_verbs,beginner,Nye,
+ibo:word:gbur-round,word,daily_life,beginner,Gbur gburugburu,
+ibo:word:agha,word,daily_life,beginner,Agha,
+ibo:word:hapu,word,everyday_verbs,beginner,Hapụ,
+ibo:word:isi-smell,word,health,beginner,Ịsị,
