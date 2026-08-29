@@ -2,7 +2,9 @@
   "name": "Jalɛ",
   "short_name": "Jalɛ",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#f8f1e5",
-  "theme_color": "#2f234f"
+  "orientation": "portrait",
+  "background_color": "#f7f0df",
+  "theme_color": "#25214f"
 }

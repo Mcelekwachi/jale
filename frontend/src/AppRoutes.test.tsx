@@ -30,6 +30,9 @@ vi.mock("./routes/Onboarding", () => ({
 vi.mock("./routes/Settings", () => ({ Settings: () => <main>Settings</main> }));
 vi.mock("./routes/SignIn", () => ({ SignIn: () => <main>Sign in</main> }));
 vi.mock("./routes/Study", () => ({ Study: () => <main>Study</main> }));
+vi.mock("./routes/PublicProfile", () => ({
+  PublicProfile: () => <main>Public profile</main>,
+}));
 
 describe("registered routes", () => {
   it.each([
@@ -43,6 +46,7 @@ describe("registered routes", () => {
     "/",
     "/settings",
     "/study/foundations/1",
+    "/u/ada-learner",
   ])("never renders an empty document at %s", (path) => {
     window.history.replaceState({}, "", path);
     const { container } = render(<App />);

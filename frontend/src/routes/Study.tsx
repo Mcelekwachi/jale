@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { QuizFeedback } from "../components/QuizFeedback";
@@ -13,13 +13,27 @@ import type {
   StudySession,
   UserProfile,
 } from "../lib/types";
-import {
-  AnswerQueue,
-  type AnswerResponse,
-  type PendingAnswer,
-} from "../study/answerQueue";
+import type { AnswerResponse } from "../study/answerQueue";
+import { answerQueue } from "../study/answerQueueService";
 import { AudioButton } from "../study/AudioButton";
 import { FlagSheet } from "../study/FlagSheet";
+
+const META_LANGUAGE_KEY = "jale:meta-language";
+
+async function loadMetaLanguage(): Promise<string> {
+  try {
+    const profile = await apiFetch<UserProfile>("/v1/me", {
+      authenticated: true,
+    });
+    const code = profile.preferences.meta_language ?? defaultMetaLanguage();
+    localStorage.setItem(META_LANGUAGE_KEY, code);
+    return code;
+  } catch (error) {
+    if (!navigator.onLine)
+      return localStorage.getItem(META_LANGUAGE_KEY) ?? defaultMetaLanguage();
+    throw error;
+  }
+}
 
 export function Study() {
   const { trackSlug = "", unitPosition = "" } = useParams();
@@ -38,34 +52,24 @@ export function Study() {
   const [queueError, setQueueError] = useState(false);
   const [advancing, setAdvancing] = useState(false);
   const [slow, setSlow] = useState(false);
-  const queue = useMemo(
-    () =>
-      new AnswerQueue((answers: PendingAnswer[]) =>
-        apiFetch<AnswerResponse>("/v1/study/answers", {
-          method: "POST",
-          authenticated: true,
-          body: JSON.stringify({ answers }),
-        }),
-      ),
-    [],
-  );
   useEffect(() => {
     let active = true;
     setSession(null);
     setIndex(0);
     setRevealed(false);
-    void Promise.all([
-      apiFetch<UserProfile>("/v1/me", { authenticated: true }),
-      apiFetch<MetaLanguage[]>("/v1/languages/meta"),
-      apiFetch<ResolvedTrack>("/v1/me/track", { authenticated: true }),
-    ])
-      .then(async ([profile, languages, resolvedTrack]) => {
-        const code = profile.preferences.meta_language ?? defaultMetaLanguage();
+    const load = async () => {
+      try {
+        const [code, languages, resolvedTrack] = await Promise.all([
+          loadMetaLanguage(),
+          apiFetch<MetaLanguage[]>("/v1/languages/meta"),
+          apiFetch<ResolvedTrack>("/v1/me/track", { authenticated: true }),
+        ]);
         const params = new URLSearchParams({ meta_language: code, direction });
         const next = await apiFetch<StudySession>(
           `/v1/tracks/${trackSlug}/units/${unitPosition}/items?${params}`,
           { authenticated: true, onSlowChange: (v) => active && setSlow(v) },
         );
+        if (!next) throw new Error("Study unit was not available");
         if (active) {
           setMeta(code);
           setMetaName(languages.find((l) => l.code === code)?.name ?? code);
@@ -73,16 +77,18 @@ export function Study() {
           setSession(next);
           setShownAt(Date.now());
         }
-      })
-      .catch(
-        (e: unknown) =>
-          active &&
+      } catch (e) {
+        if (active)
           setError(
             e instanceof Error
-              ? e.message
+              ? navigator.onLine
+                ? e.message
+                : "You'll need a connection for this unit."
               : "Could not load this study session",
-          ),
-      );
+          );
+      }
+    };
+    void load();
     return () => {
       active = false;
     };
@@ -91,7 +97,7 @@ export function Study() {
     if (!session) return;
     setCorrect((value) => value + Number(isCorrect));
     try {
-      await queue.add({
+      await answerQueue.add({
         content_id: session.items[index].id,
         correct: isCorrect,
         mode: session.mode,
@@ -112,11 +118,13 @@ export function Study() {
       setShownAt(Date.now());
       setAdvancing(false);
     } else {
+      localStorage.setItem("jale:completed-study-session", "true");
+      window.dispatchEvent(new Event("jale:study-session-completed"));
       try {
-        const result = await queue.flush();
+        const result = await answerQueue.flush();
         setSummary(
           result ??
-            queue.latestResponse ?? {
+            answerQueue.latestResponse ?? {
               results: [],
               current_streak: 0,
               today_xp: 0,
@@ -162,7 +170,7 @@ export function Study() {
               <button
                 className="mt-4 min-h-11 rounded-xl bg-indigo-deep px-5 text-cream"
                 onClick={() =>
-                  void queue
+                  void answerQueue
                     .flush()
                     .then((r) => {
                       setSummary(r);
@@ -218,7 +226,7 @@ export function Study() {
             <button
               className="min-h-11 font-bold underline"
               onClick={() =>
-                void queue
+                void answerQueue
                   .flush()
                   .then(() => setQueueError(false))
                   .catch(() => setQueueError(true))
