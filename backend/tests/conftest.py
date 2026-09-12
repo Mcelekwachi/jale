@@ -1,7 +1,7 @@
 """Test fixtures.
 
 These tests run against a real PostgreSQL with the real schema and the real
-213-row seed. Nothing is mocked: the queries contain enum casts and array
+235-row seed. Nothing is mocked: the queries contain enum casts and array
 containment that a mock would happily accept and production would reject.
 
 DATABASE_URL must point at a disposable database. CI provides one as a

@@ -251,6 +251,8 @@ async def test_due_meta_language_fallback_direction_and_exact_item_shape(
         "meta_language",
         "meta_language_used",
         "audio_url",
+        "image_url",
+        "image_attribution",
         "audio_state",
         "target_text_toned",
         "literal_translation",

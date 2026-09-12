@@ -148,6 +148,8 @@ class ContentItem(BaseModel):
     example_translation: str | None = None
 
     audio_url: str | None = None
+    image_url: str | None = None
+    image_attribution: str | None = None
     audio_state: str
     verified: bool
     flag_count: int
@@ -230,6 +232,8 @@ class StudyItem(BaseModel):
     meta_language: str
     meta_language_used: str
     audio_url: str | None = None
+    image_url: str | None = None
+    image_attribution: str | None = None
     audio_state: str
 
     # phrase practice and proverbs

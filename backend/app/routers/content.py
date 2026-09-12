@@ -22,7 +22,8 @@ _SELECT = """
                     default_ct.literal_translation) AS literal_translation,
            COALESCE(requested_ct.cultural_note, default_ct.cultural_note) AS cultural_note,
            c.example_sentence, c.example_translation,
-           c.audio_url, c.audio_state, c.verified, c.flag_count
+           c.audio_url, c.image_url, c.image_attribution,
+           c.audio_state, c.verified, c.flag_count
       FROM content_items c
       JOIN languages l ON l.id = c.language_id
       JOIN languages default_ml ON default_ml.code = %(default_meta_language)s

@@ -31,7 +31,8 @@ c.id, c.content_type, c.difficulty_level, c.category_id,
        COALESCE(requested_ct.cultural_note,
                 default_ct.cultural_note) AS cultural_note,
        c.example_sentence, c.example_translation,
-       c.audio_url, c.audio_state, c.verified, c.flag_count
+       c.audio_url, c.image_url, c.image_attribution,
+       c.audio_state, c.verified, c.flag_count
 """
 
 _TRANSLATION_JOINS = """
@@ -110,6 +111,8 @@ def shape_item(
         "meta_language": row["meta_language"],
         "meta_language_used": row["meta_language_used"],
         "audio_url": row["audio_url"],
+        "image_url": row["image_url"],
+        "image_attribution": row["image_attribution"],
         "audio_state": row["audio_state"],
         "verified": row["verified"],
         "flag_count": row["flag_count"],
