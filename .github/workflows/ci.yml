@@ -149,9 +149,26 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -r backend/requirements-dev.txt
+      # TEMPORARY: remove after JWKS investigation.
+      - name: TEMPORARY - Capture JWKS dependency versions
+        shell: bash
+        run: |
+          python --version
+          python -m pip freeze | grep -Ei '^(anyio|cryptography|fastapi|httpx|PyJWT|pytest|pytest-asyncio|starlette)=='
+          echo 'Install mechanism: pip install -r backend/requirements-dev.txt'
+          echo 'Resolution note: requirements files are not a lockfile; PyJWT and transitive dependencies may resolve differently over time.'
       - name: Run suite
         working-directory: backend
         run: pytest -q
+      # TEMPORARY: remove after JWKS investigation.
+      - name: TEMPORARY - Run JWKS tests in isolation
+        if: ${{ always() }}
+        working-directory: backend
+        run: >-
+          pytest -q
+          unit_tests/test_auth_jwks.py::test_valid_es256_token_authenticates
+          unit_tests/test_auth_jwks.py::test_jwks_is_fetched_once_across_many_tokens
+          -p no:cacheprovider
 
   build:
     name: Build image
