@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import uuid
 from functools import lru_cache
 from typing import Annotated, Any
@@ -55,7 +56,9 @@ def _decode(credentials: HTTPAuthorizationCredentials | None) -> dict[str, Any]:
             options={"require": ["exp", "sub", "aud"]},
         )
         uuid.UUID(str(claims["sub"]))
-    except Exception:  # noqa: BLE001 — all authentication failures must be indistinguishable
+    # TEMPORARY — JWKS investigation, revert before merge.
+    except Exception as exc:  # noqa: BLE001
+        print(f"JWKS_DEBUG: {type(exc).__name__}: {exc}", file=sys.stderr)
         raise _AUTH_ERROR from None
     return claims
 
