@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import io
-import json
 import uuid
 from datetime import UTC, datetime, timedelta
-from urllib.error import URLError
 
 import jwt
 import pytest
@@ -57,13 +54,16 @@ def auth_settings(monkeypatch):
 def install_jwks(monkeypatch, jwk: dict[str, object], *, fail: bool = False) -> list[str]:
     requests: list[str] = []
 
-    def open_jwks(request, **_kwargs):
-        requests.append(request.full_url)
+    def fetch_jwks(client: jwt.PyJWKClient):
+        requests.append(client.uri)
         if fail:
-            raise URLError("JWKS unavailable")
-        return io.BytesIO(json.dumps({"keys": [jwk]}).encode())
+            raise jwt.PyJWKClientConnectionError("JWKS unavailable")
+        jwk_set = {"keys": [jwk]}
+        if client.jwk_set_cache is not None:
+            client.jwk_set_cache.put(jwk_set)
+        return jwk_set
 
-    monkeypatch.setattr("urllib.request.urlopen", open_jwks)
+    monkeypatch.setattr(jwt.PyJWKClient, "fetch_data", fetch_jwks)
     return requests
 
 
