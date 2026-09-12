@@ -65,6 +65,8 @@ class AdminContentListItem(BaseModel):
     target_text_toned: str | None
     translation: str | None
     audio_url: str | None
+    image_url: str | None
+    image_attribution: str | None
     audio_state: AudioStatus
     status: ContentStatus
     verified: bool
@@ -94,6 +96,8 @@ class AdminContentState(BaseModel):
     example_sentence: str | None
     example_translation: str | None
     audio_url: str | None
+    image_url: str | None
+    image_attribution: str | None
     audio_state: AudioStatus
     status: ContentStatus
     verified: bool
@@ -171,6 +175,8 @@ class AdminContentPatch(BaseModel):
     category: str | None = None
     difficulty_level: Difficulty | None = None
     audio_url: str | None = None
+    image_url: str | None = None
+    image_attribution: str | None = None
     audio_state: AudioStatus | None = None
     status: ContentStatus | None = None
     sort_order: int | None = None

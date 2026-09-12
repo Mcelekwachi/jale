@@ -194,6 +194,8 @@ ALTER TABLE content_items
   ADD COLUMN IF NOT EXISTS example_sentence TEXT,
   ADD COLUMN IF NOT EXISTS example_translation TEXT,
   ADD COLUMN IF NOT EXISTS audio_url TEXT,
+  ADD COLUMN IF NOT EXISTS image_url TEXT,
+  ADD COLUMN IF NOT EXISTS image_attribution TEXT,
   ADD COLUMN IF NOT EXISTS audio_state audio_status NOT NULL DEFAULT 'missing',
   ADD COLUMN IF NOT EXISTS status content_status NOT NULL DEFAULT 'published',
   ADD COLUMN IF NOT EXISTS verified BOOLEAN NOT NULL DEFAULT FALSE,

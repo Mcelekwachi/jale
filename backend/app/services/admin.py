@@ -15,7 +15,8 @@ _CONTENT_STATE_COLUMNS = """
     c.id, c.source_key, language.code AS language, dialect.code AS dialect,
     category.slug AS category, c.content_type, c.difficulty_level,
     c.target_text, c.target_text_toned, c.example_sentence,
-    c.example_translation, c.audio_url, c.audio_state, c.status,
+    c.example_translation, c.audio_url, c.image_url, c.image_attribution,
+    c.audio_state, c.status,
     c.verified, c.verified_by, verifier.display_name AS verified_by_name,
     c.verified_at, c.contributor_id, c.flag_count, c.sort_order,
     c.created_at, c.updated_at
@@ -182,7 +183,8 @@ async def list_content(
                 """
             SELECT c.id, c.source_key, l.code AS language, c.content_type,
                    c.difficulty_level, cat.slug AS category, c.target_text,
-                   c.target_text_toned, ct.translation, c.audio_url, c.audio_state,
+                   c.target_text_toned, ct.translation, c.audio_url,
+                   c.image_url, c.image_attribution, c.audio_state,
                    c.status, c.verified, c.flag_count, c.sort_order,
                    c.created_at, c.updated_at
               FROM content_items c
@@ -289,6 +291,8 @@ async def patch_content(
         "target_text_toned",
         "difficulty_level",
         "audio_url",
+        "image_url",
+        "image_attribution",
         "audio_state",
         "status",
         "sort_order",
