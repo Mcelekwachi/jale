@@ -9,7 +9,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from app.auth import current_user
 from app.schemas import (
     PreferencesPatch,
-    ResolvedTrack,
+    ResolvedUserTrack,
     SkipOnboarding,
     UserProfile,
     UserStats,
@@ -47,9 +47,10 @@ async def read_stats(
     return await get_stats(_user_id(user), now)
 
 
-@router.get("/track", response_model=ResolvedTrack)
+@router.get("/track", response_model=ResolvedUserTrack)
 async def read_my_track(user: Annotated[dict, Depends(current_user)]) -> dict:
-    preferences = await get_user_track_preferences(_user_id(user))
+    user_id = _user_id(user)
+    preferences = await get_user_track_preferences(user_id)
     language = preferences.pop("language")
     track, priority = await track_resolver.resolve(language, **preferences)
     if track is None:
@@ -58,7 +59,7 @@ async def read_my_track(user: Annotated[dict, Depends(current_user)]) -> dict:
             detail=f"no track resolved for language {language!r} — is it seeded?",
         )
     track = dict(track)
-    track["units"] = await track_resolver.get_units(language, track["slug"])
+    track["units"] = await track_resolver.get_units_with_progress(language, track["slug"], user_id)
     return {
         "track": track,
         "matched_priority": priority,
