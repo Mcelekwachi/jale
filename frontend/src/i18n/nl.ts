@@ -132,4 +132,21 @@ export const nl = {
     ianaTimezone: "IANA-tijdzone",
     saveTimezone: "Tijdzone opslaan",
   },
+  publicProfile: {
+    loadError: "Dit profiel laden is niet gelukt",
+    unavailable: "Dit profiel is niet beschikbaar",
+    badLink:
+      "De link klopt misschien niet of het profiel is niet meer openbaar.",
+    visit: "Ga naar Jalɛ",
+    loading: "Openbaar profiel laden",
+    learner: "Jalɛ-leerder",
+    learning: "Leert",
+    joined: "Begonnen in",
+    current: "Nu",
+    currentStreak: "dagen in de huidige reeks",
+    personalBest: "Persoonlijk record",
+    longestStreak: "dagen in de langste reeks",
+    progress: "Voortgang",
+    mastered: "beheerst",
+  },
 } satisfies DeepPartial<UiStrings>;

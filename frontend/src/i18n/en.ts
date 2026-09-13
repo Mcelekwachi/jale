@@ -129,6 +129,23 @@ export const en = {
     ianaTimezone: "IANA timezone",
     saveTimezone: "Save timezone",
   },
+  publicProfile: {
+    loadError: "Could not load this profile",
+    unavailable: "This profile isn't available",
+    badLink:
+      "The link may be incorrect or the profile may no longer be public.",
+    visit: "Visit Jalɛ",
+    loading: "Loading public profile",
+    learner: "Jalɛ learner",
+    learning: "Learning",
+    joined: "Joined",
+    current: "Current",
+    currentStreak: "day current streak",
+    personalBest: "Personal best",
+    longestStreak: "day longest streak",
+    progress: "Progress",
+    mastered: "mastered",
+  },
 } as const;
 
 export type UiStrings = typeof en;

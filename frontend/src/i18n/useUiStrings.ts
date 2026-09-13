@@ -54,8 +54,8 @@ export function setUiLanguage(language?: string | null): void {
   listeners.forEach((listener) => listener());
 }
 
-export function useUiStrings(): UiStrings {
-  const language = useSyncExternalStore(
+export function useUiLanguage(): UiLanguage {
+  return useSyncExternalStore(
     (listener) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
@@ -63,5 +63,9 @@ export function useUiStrings(): UiStrings {
     () => currentLanguage,
     () => "eng",
   );
+}
+
+export function useUiStrings(): UiStrings {
+  const language = useUiLanguage();
   return language === "nld" ? dutch : en;
 }
