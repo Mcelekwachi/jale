@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useUiStrings } from "../i18n/useUiStrings";
 
 interface InstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -17,15 +18,21 @@ function isStandalone(): boolean {
 
 function isIosSafari(): boolean {
   const agent = navigator.userAgent;
-  return /iPad|iPhone|iPod/.test(agent) && /Safari/.test(agent) &&
-    !/CriOS|FxiOS|EdgiOS/.test(agent);
+  return (
+    /iPad|iPhone|iPod/.test(agent) &&
+    /Safari/.test(agent) &&
+    !/CriOS|FxiOS|EdgiOS/.test(agent)
+  );
 }
 
 export function PwaPrompts() {
+  const strings = useUiStrings().shared;
   const [completed, setCompleted] = useState(
     () => localStorage.getItem(COMPLETED_KEY) === "true",
   );
-  const [installEvent, setInstallEvent] = useState<InstallPromptEvent | null>(null);
+  const [installEvent, setInstallEvent] = useState<InstallPromptEvent | null>(
+    null,
+  );
   const [dismissed, setDismissed] = useState(
     () => localStorage.getItem(DISMISSED_KEY) === "true",
   );
@@ -53,11 +60,23 @@ export function PwaPrompts() {
   if (!ios && !installEvent) return null;
 
   return (
-    <aside className="fixed inset-x-4 bottom-4 z-40 mx-auto max-w-md rounded-2xl bg-cream p-5 shadow-card" aria-label="Install Jalɛ">
-      <button type="button" onClick={dismiss} aria-label="Dismiss install prompt" className="float-right min-h-11 px-3">×</button>
-      <h2 className="font-display text-xl text-indigo-deep">Add Jalɛ to your home screen</h2>
+    <aside
+      className="fixed inset-x-4 bottom-4 z-40 mx-auto max-w-md rounded-2xl bg-cream p-5 shadow-card"
+      aria-label={strings.installLabel}
+    >
+      <button
+        type="button"
+        onClick={dismiss}
+        aria-label={strings.dismissInstall}
+        className="float-right min-h-11 px-3"
+      >
+        ×
+      </button>
+      <h2 className="font-display text-xl text-indigo-deep">
+        {strings.addToHome}
+      </h2>
       {ios ? (
-        <p className="mt-2 text-sm">Tap Share, then Add to Home Screen.</p>
+        <p className="mt-2 text-sm">{strings.iosInstall}</p>
       ) : (
         <button
           type="button"
@@ -67,7 +86,7 @@ export function PwaPrompts() {
             setInstallEvent(null);
           }}
         >
-          Add
+          {strings.add}
         </button>
       )}
     </aside>

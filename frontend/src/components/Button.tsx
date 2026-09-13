@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, PropsWithChildren } from "react";
+import { useUiStrings } from "../i18n/useUiStrings";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary";
@@ -13,6 +14,7 @@ export function Button({
   disabled,
   ...props
 }: PropsWithChildren<ButtonProps>) {
+  const strings = useUiStrings().shared;
   const colors =
     variant === "primary"
       ? "bg-indigo-deep text-cream hover:bg-indigo-rich"
@@ -23,7 +25,7 @@ export function Button({
       disabled={disabled || busy}
       {...props}
     >
-      {busy ? "Please wait…" : children}
+      {busy ? strings.pleaseWait : children}
     </button>
   );
 }
