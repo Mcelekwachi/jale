@@ -208,12 +208,18 @@ export function Home() {
                 <h3 className="mt-2 font-display text-2xl">
                   Keep your learning fresh
                 </h3>
-                <a
-                  href="#review-due"
-                  className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-cream px-5 font-bold text-indigo-deep"
-                >
-                  Review due
-                </a>
+                {due.items.length > 0 ? (
+                  <a
+                    href="#review-due"
+                    className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-cream px-5 font-bold text-indigo-deep"
+                  >
+                    Review due
+                  </a>
+                ) : (
+                  <p className="mt-4 text-lavender">
+                    Nothing to review right now
+                  </p>
+                )}
               </>
             ) : nextUnit ? (
               <>
@@ -222,19 +228,13 @@ export function Home() {
                 </p>
                 <h3 className="mt-2 font-display text-3xl">{nextUnit.title}</h3>
                 <p className="mt-1 text-lavender">{modeNames[nextUnit.mode]}</p>
-                {nextUnit.available > 0 ? (
-                  <Link
-                    to={`/study/${resolved.track.slug}/${nextUnit.position}`}
-                    aria-label={`${nextUnit.progress.done > 0 ? "Continue" : "Start"} ${nextUnit.title}`}
-                    className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-cream px-5 font-bold text-indigo-deep"
-                  >
-                    {nextUnit.progress.done > 0 ? "Continue" : "Start"}
-                  </Link>
-                ) : (
-                  <p className="mt-4 text-sm text-lavender">
-                    Content is being prepared
-                  </p>
-                )}
+                <Link
+                  to={`/study/${resolved.track.slug}/${nextUnit.position}`}
+                  aria-label={`${nextUnit.progress.done > 0 ? "Continue" : "Start"} ${nextUnit.title}`}
+                  className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-cream px-5 font-bold text-indigo-deep"
+                >
+                  {nextUnit.progress.done > 0 ? "Continue" : "Start"}
+                </Link>
               </>
             ) : (
               <p className="text-lavender">No units are available yet.</p>
@@ -248,30 +248,15 @@ export function Home() {
             <ol className="mt-3 divide-y divide-sand">
               {units.map((unit) => (
                 <li key={unit.position}>
-                  {unit.available > 0 ? (
-                    <Link
-                      to={`/study/${resolved.track.slug}/${unit.position}`}
-                      className="flex min-h-12 items-center gap-3 py-3 text-indigo-deep"
-                    >
-                      <span className="w-6 shrink-0 font-bold text-terracotta">
-                        {unit.position}
-                      </span>
-                      <strong>{unit.title}</strong>
-                    </Link>
-                  ) : (
-                    <div
-                      aria-disabled="true"
-                      className="flex min-h-12 items-center gap-3 py-3 text-muted"
-                    >
-                      <span className="w-6 shrink-0">{unit.position}</span>
-                      <span>
-                        <strong>{unit.title}</strong>
-                        <small className="ml-2">
-                          Content is being prepared
-                        </small>
-                      </span>
-                    </div>
-                  )}
+                  <Link
+                    to={`/study/${resolved.track.slug}/${unit.position}`}
+                    className="flex min-h-12 items-center gap-3 py-3 text-indigo-deep"
+                  >
+                    <span className="w-6 shrink-0 font-bold text-terracotta">
+                      {unit.position}
+                    </span>
+                    <strong>{unit.title}</strong>
+                  </Link>
                 </li>
               ))}
             </ol>

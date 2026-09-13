@@ -50,7 +50,7 @@ describe("Home", () => {
     });
   });
 
-  it("shows track, due review, progress, and disables unavailable units", async () => {
+  it("shows track, due review, progress, and keeps every unit accessible", async () => {
     vi.mocked(apiFetch)
       .mockResolvedValueOnce(track as never)
       .mockResolvedValueOnce({
@@ -84,10 +84,10 @@ describe("Home", () => {
     expect(
       screen.getByRole("link", { name: /start greetings/i }),
     ).toHaveAttribute("href", "/study/ibo_foundations/1");
-    expect(
-      screen.queryByRole("link", { name: /proverbs/i }),
-    ).not.toBeInTheDocument();
-    expect(screen.getByText(/content is being prepared/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /proverbs/i })).toHaveAttribute(
+      "href",
+      "/study/ibo_foundations/2",
+    );
   });
 
   it("invites a new learner instead of rendering a zero streak badge", async () => {
@@ -228,6 +228,40 @@ describe("Home", () => {
       "href",
       "#review-due",
     );
+  });
+
+  it("does not render a dead review link when the path is complete with nothing due", async () => {
+    const completedTrack = {
+      ...track,
+      track: {
+        ...track.track,
+        units: track.track.units.map((unit) => ({
+          ...unit,
+          progress: { done: unit.item_count, total: unit.item_count },
+          completed: true,
+        })),
+      },
+    };
+    vi.mocked(apiFetch)
+      .mockResolvedValueOnce(completedTrack as never)
+      .mockResolvedValueOnce({
+        current_streak: 4,
+        today_goal_met: true,
+      } as never)
+      .mockResolvedValueOnce({ items: [] } as never)
+      .mockResolvedValueOnce({ preferences: { meta_language: "eng" } } as never)
+      .mockResolvedValueOnce([{ code: "eng", name: "English" }] as never);
+
+    render(<Home />, { wrapper: MemoryRouter });
+
+    const continueCard = await screen.findByRole("region", {
+      name: /continue/i,
+    });
+    expect(continueCard).toHaveTextContent(/path complete/i);
+    expect(continueCard).toHaveTextContent(/nothing to review right now/i);
+    expect(
+      screen.queryByRole("link", { name: /review due/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows queued answers and lets the learner sync them", async () => {
