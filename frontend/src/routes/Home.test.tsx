@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { apiFetch } from "../lib/api";
@@ -61,7 +61,17 @@ describe("Home", () => {
       .mockResolvedValueOnce({ preferences: { meta_language: "nld" } } as never)
       .mockResolvedValueOnce([{ code: "nld", name: "Dutch" }] as never);
 
-    render(<Home />, { wrapper: MemoryRouter });
+    render(
+      <MemoryRouter>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route
+            path="/study/:track/:unit"
+            element={<p>Study destination</p>}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
 
     expect(
       await screen.findByRole("link", { name: /settings/i }),
@@ -162,7 +172,17 @@ describe("Home", () => {
       .mockResolvedValueOnce({ preferences: { meta_language: "eng" } } as never)
       .mockResolvedValueOnce([{ code: "eng", name: "English" }] as never);
 
-    render(<Home />, { wrapper: MemoryRouter });
+    render(
+      <MemoryRouter>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route
+            path="/study/:track/:unit"
+            element={<p>Study destination</p>}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
 
     const path = await screen.findByRole("region", {
       name: /full learning path/i,
@@ -170,10 +190,10 @@ describe("Home", () => {
     expect(path).toHaveClass("text-sm");
     expect(path).toHaveTextContent("Greetings");
     expect(path).toHaveTextContent("Proverbs");
-    expect(screen.getByRole("link", { name: /2.*proverbs/i })).toHaveAttribute(
-      "href",
-      "/study/ibo_foundations/2",
-    );
+    const secondUnit = screen.getByRole("link", { name: /2.*proverbs/i });
+    expect(secondUnit).toHaveAttribute("href", "/study/ibo_foundations/2");
+    await userEvent.click(secondUnit);
+    expect(screen.getByText("Study destination")).toBeInTheDocument();
   });
 
   it("points to review due when every unit is complete", async () => {
