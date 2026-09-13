@@ -3,7 +3,7 @@ import { Navigate, Outlet } from "react-router-dom";
 
 import { ErrorMessage } from "../components/ErrorMessage";
 import { Spinner } from "../components/Spinner";
-import { useUiStrings } from "../i18n/useUiStrings";
+import { getUiStrings, useUiStrings } from "../i18n/useUiStrings";
 import { apiFetch } from "../lib/api";
 import type { UserProfile } from "../lib/types";
 
@@ -24,13 +24,15 @@ export function OnboardingGuard() {
         (caught: unknown) =>
           active &&
           setError(
-            caught instanceof Error ? caught.message : strings.profileLoadError,
+            caught instanceof Error
+              ? caught.message
+              : getUiStrings().shared.profileLoadError,
           ),
       );
     return () => {
       active = false;
     };
-  }, [strings.profileLoadError]);
+  }, []);
 
   if (error)
     return (

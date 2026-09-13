@@ -7,7 +7,11 @@ import { QuizFeedback } from "../components/QuizFeedback";
 import { Spinner } from "../components/Spinner";
 import { apiFetch } from "../lib/api";
 import { defaultMetaLanguage } from "../lib/locale";
-import { setUiLanguage, useUiStrings } from "../i18n/useUiStrings";
+import {
+  getUiStrings,
+  setUiLanguage,
+  useUiStrings,
+} from "../i18n/useUiStrings";
 import { coverageLabel, hasIncompleteCoverage } from "../lib/languageCoverage";
 import type {
   CatalogueLanguage,
@@ -128,13 +132,15 @@ export function Onboarding() {
         (caught: unknown) =>
           active &&
           setError(
-            caught instanceof Error ? caught.message : strings.loadError,
+            caught instanceof Error
+              ? caught.message
+              : getUiStrings().onboarding.loadError,
           ),
       );
     return () => {
       active = false;
     };
-  }, [strings.loadError]);
+  }, []);
 
   useEffect(() => {
     if ((step !== 2 && step !== 10) || catalogue) return;
@@ -147,13 +153,15 @@ export function Onboarding() {
         (caught: unknown) =>
           active &&
           setError(
-            caught instanceof Error ? caught.message : strings.catalogueError,
+            caught instanceof Error
+              ? caught.message
+              : getUiStrings().onboarding.catalogueError,
           ),
       );
     return () => {
       active = false;
     };
-  }, [catalogue, step, strings.catalogueError]);
+  }, [catalogue, step]);
 
   useEffect(() => {
     if (step !== 9 || questions) return;
@@ -171,15 +179,17 @@ export function Onboarding() {
       .then((pages) => {
         const built = pages.map(quizQuestion);
         if (built.some((question) => question === null))
-          throw new Error(strings.placementUnavailable);
+          throw new Error(getUiStrings().onboarding.placementUnavailable);
         setQuestions(built as QuizQuestion[]);
       })
       .catch((caught: unknown) =>
         setError(
-          caught instanceof Error ? caught.message : strings.placementError,
+          caught instanceof Error
+            ? caught.message
+            : getUiStrings().onboarding.placementError,
         ),
       );
-  }, [questions, step, strings.placementError, strings.placementUnavailable]);
+  }, [questions, step]);
 
   const preferences = profile?.preferences;
   const timezone = useMemo(

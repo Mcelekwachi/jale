@@ -17,7 +17,11 @@ import type { AnswerResponse } from "../study/answerQueue";
 import { answerQueue } from "../study/answerQueueService";
 import { AudioButton } from "../study/AudioButton";
 import { FlagSheet } from "../study/FlagSheet";
-import { setUiLanguage, useUiStrings } from "../i18n/useUiStrings";
+import {
+  getUiStrings,
+  setUiLanguage,
+  useUiStrings,
+} from "../i18n/useUiStrings";
 
 const META_LANGUAGE_KEY = "jale:meta-language";
 
@@ -72,7 +76,7 @@ export function Study() {
           `/v1/tracks/${trackSlug}/units/${unitPosition}/items?${params}`,
           { authenticated: true, onSlowChange: (v) => active && setSlow(v) },
         );
-        if (!next) throw new Error(strings.unavailable);
+        if (!next) throw new Error(getUiStrings().study.unavailable);
         if (active) {
           setMeta(code);
           setMetaName(languages.find((l) => l.code === code)?.name ?? code);
@@ -86,8 +90,8 @@ export function Study() {
             e instanceof Error
               ? navigator.onLine
                 ? e.message
-                : strings.offlineUnit
-              : strings.loadError,
+                : getUiStrings().study.offlineUnit
+              : getUiStrings().study.loadError,
           );
       }
     };
@@ -95,14 +99,7 @@ export function Study() {
     return () => {
       active = false;
     };
-  }, [
-    direction,
-    strings.loadError,
-    strings.offlineUnit,
-    strings.unavailable,
-    trackSlug,
-    unitPosition,
-  ]);
+  }, [direction, trackSlug, unitPosition]);
   const record = async (isCorrect: boolean) => {
     if (!session) return;
     setCorrect((value) => value + Number(isCorrect));
@@ -172,8 +169,11 @@ export function Study() {
           </p>
           {summary && (
             <p className="mt-2">
-              {summary.current_streak} {strings.dayStreak} · {summary.today_xp}{" "}
-              {strings.xpToday}
+              {summary.current_streak}{" "}
+              {summary.current_streak === 1
+                ? strings.dayStreakSingular
+                : strings.dayStreak}{" "}
+              · {summary.today_xp} {strings.xpToday}
             </p>
           )}
           {retry && (

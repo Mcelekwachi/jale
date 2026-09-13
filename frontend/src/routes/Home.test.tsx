@@ -67,6 +67,7 @@ describe("Home", () => {
       await screen.findByRole("link", { name: /instellingen/i }),
     ).toBeInTheDocument();
     expect(screen.getByText("Je leerpad")).toBeInTheDocument();
+    expect(vi.mocked(apiFetch)).toHaveBeenCalledTimes(5);
   });
 
   it("shows track, due review, progress, and keeps every unit accessible", async () => {

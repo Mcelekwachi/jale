@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 
 import { en, type UiStrings } from "./en";
 import { nl, type DeepPartial } from "./nl";
+import { defaultMetaLanguage } from "../lib/locale";
 
 const UI_LANGUAGE_KEY = "jale:meta-language";
 const listeners = new Set<() => void>();
@@ -14,8 +15,8 @@ function normalizeLanguage(language?: string | null): UiLanguage {
 
 let currentLanguage = normalizeLanguage(
   typeof localStorage === "undefined"
-    ? null
-    : localStorage.getItem(UI_LANGUAGE_KEY),
+    ? defaultMetaLanguage()
+    : (localStorage.getItem(UI_LANGUAGE_KEY) ?? defaultMetaLanguage()),
 );
 
 function mergeWithEnglish<T extends Record<string, unknown>>(

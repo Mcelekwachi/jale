@@ -3,7 +3,11 @@ import { Link } from "react-router-dom";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { Spinner } from "../components/Spinner";
 import { apiFetch } from "../lib/api";
-import { setUiLanguage, useUiStrings } from "../i18n/useUiStrings";
+import {
+  getUiStrings,
+  setUiLanguage,
+  useUiStrings,
+} from "../i18n/useUiStrings";
 import type {
   DueStudyItems,
   MetaLanguage,
@@ -69,13 +73,15 @@ export function Home() {
         (caught: unknown) =>
           active &&
           setError(
-            caught instanceof Error ? caught.message : strings.loadError,
+            caught instanceof Error
+              ? caught.message
+              : getUiStrings().home.loadError,
           ),
       );
     return () => {
       active = false;
     };
-  }, [strings.loadError]);
+  }, []);
   if (!data)
     return error ? (
       <main className="p-5">
@@ -113,7 +119,10 @@ export function Home() {
             <h1 className="font-display text-3xl">{strings.startStreak}</h1>
           ) : (
             <h1 className="font-display text-3xl">
-              {stats.current_streak} {strings.dayStreak}
+              {stats.current_streak}{" "}
+              {stats.current_streak === 1
+                ? strings.dayStreakSingular
+                : strings.dayStreak}
             </h1>
           )}
           <p className="mt-2 text-lavender">

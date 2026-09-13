@@ -8,7 +8,11 @@ import { Spinner } from "../components/Spinner";
 import { apiFetch } from "../lib/api";
 import { defaultMetaLanguage } from "../lib/locale";
 import { coverageLabel } from "../lib/languageCoverage";
-import { setUiLanguage, useUiStrings } from "../i18n/useUiStrings";
+import {
+  getUiStrings,
+  setUiLanguage,
+  useUiStrings,
+} from "../i18n/useUiStrings";
 import type { MetaLanguage, UserPreferences, UserProfile } from "../lib/types";
 import { OptionList } from "../onboarding/OptionList";
 import {
@@ -93,13 +97,15 @@ export function Settings() {
         (caught: unknown) =>
           active &&
           setError(
-            caught instanceof Error ? caught.message : strings.loadError,
+            caught instanceof Error
+              ? caught.message
+              : getUiStrings().settings.loadError,
           ),
       );
     return () => {
       active = false;
     };
-  }, [browserTimezone, strings.loadError]);
+  }, [browserTimezone]);
 
   async function update(
     field: keyof UserPreferences,

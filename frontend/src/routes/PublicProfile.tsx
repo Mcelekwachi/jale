@@ -5,7 +5,11 @@ import { ErrorMessage } from "../components/ErrorMessage";
 import { Spinner } from "../components/Spinner";
 import { ApiError, apiFetch } from "../lib/api";
 import type { PublicProfileSummary } from "../lib/types";
-import { useUiLanguage, useUiStrings } from "../i18n/useUiStrings";
+import {
+  getUiStrings,
+  useUiLanguage,
+  useUiStrings,
+} from "../i18n/useUiStrings";
 
 function joinedLabel(joinedMonth: string, locale: string): string {
   return new Intl.DateTimeFormat(locale, {
@@ -42,13 +46,15 @@ export function PublicProfile() {
         if (status === 404) setMissing(true);
         else
           setError(
-            caught instanceof Error ? caught.message : strings.loadError,
+            caught instanceof Error
+              ? caught.message
+              : getUiStrings().publicProfile.loadError,
           );
       });
     return () => {
       active = false;
     };
-  }, [shareSlug, strings.loadError]);
+  }, [shareSlug]);
 
   if (missing)
     return (
@@ -92,13 +98,19 @@ export function PublicProfile() {
           <div className="rounded-2xl bg-ochre-soft p-4">
             <dt className="text-sm">{strings.current}</dt>
             <dd className="mt-1 font-display text-2xl font-bold">
-              {profile.current_streak} {strings.currentStreak}
+              {profile.current_streak}{" "}
+              {profile.current_streak === 1
+                ? strings.currentStreakSingular
+                : strings.currentStreak}
             </dd>
           </div>
           <div className="rounded-2xl bg-ochre-soft p-4">
             <dt className="text-sm">{strings.personalBest}</dt>
             <dd className="mt-1 font-display text-2xl font-bold">
-              {profile.longest_streak} {strings.longestStreak}
+              {profile.longest_streak}{" "}
+              {profile.longest_streak === 1
+                ? strings.longestStreakSingular
+                : strings.longestStreak}
             </dd>
           </div>
           <div className="rounded-2xl bg-ochre-soft p-4">

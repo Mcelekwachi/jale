@@ -1,5 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { setUiLanguage, useUiStrings } from "./useUiStrings";
 
@@ -33,5 +33,19 @@ describe("useUiStrings", () => {
     expect(result.current.onboarding.heritageSpeaker).toBe(
       "Igbo heritage speaker",
     );
+  });
+
+  it("uses the Dutch browser locale when no preference is cached", async () => {
+    localStorage.clear();
+    const language = vi
+      .spyOn(window.navigator, "language", "get")
+      .mockReturnValue("nl-NL");
+    vi.resetModules();
+
+    const fresh = await import("./useUiStrings");
+
+    expect(fresh.getUiStrings().home.continueCta).toBe("Doorgaan");
+    fresh.setUiLanguage("eng");
+    language.mockRestore();
   });
 });
