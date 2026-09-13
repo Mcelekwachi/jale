@@ -36,7 +36,9 @@ export function Home() {
   useEffect(() => {
     let active = true;
     const update = () =>
-      void answerQueue.count().then((count) => active && setPendingAnswers(count));
+      void answerQueue
+        .count()
+        .then((count) => active && setPendingAnswers(count));
     update();
     window.addEventListener("jale:answer-queue-changed", update);
     return () => {
@@ -89,6 +91,9 @@ export function Home() {
   const metaCode = profile.preferences.meta_language ?? "eng";
   const metaName =
     languages.find(({ code }) => code === metaCode)?.name ?? metaCode;
+  const units = resolved.track.units ?? [];
+  const nextUnit = units.find((unit) => !unit.completed);
+  const allUnitsComplete = units.length > 0 && !nextUnit;
   return (
     <main className="min-h-dvh bg-warm px-5 py-7 text-ink">
       <div className="mx-auto max-w-2xl space-y-6">
@@ -130,16 +135,20 @@ export function Home() {
                 if (navigator.share) {
                   void navigator.share(shareData);
                 } else {
-                  void navigator.clipboard.writeText(url).then(() =>
-                    setShareMessage("Profile link copied"),
-                  );
+                  void navigator.clipboard
+                    .writeText(url)
+                    .then(() => setShareMessage("Profile link copied"));
                 }
               }}
             >
               Share my progress
             </button>
           )}
-          {shareMessage && <p role="status" className="mt-3 text-sm text-lavender">{shareMessage}</p>}
+          {shareMessage && (
+            <p role="status" className="mt-3 text-sm text-lavender">
+              {shareMessage}
+            </p>
+          )}
         </section>
         {(pendingAnswers > 0 || syncComplete) && (
           <section className="flex min-h-14 items-center justify-between gap-4 rounded-2xl bg-ochre-soft px-5 text-indigo-deep">
@@ -172,7 +181,10 @@ export function Home() {
           </section>
         )}
         {due.items.length > 0 && (
-          <section className="flex min-h-14 items-center justify-between rounded-2xl bg-ochre-soft px-5 font-bold text-indigo-deep">
+          <section
+            id="review-due"
+            className="flex min-h-14 items-center justify-between rounded-2xl bg-ochre-soft px-5 font-bold text-indigo-deep"
+          >
             Review due <span>{due.items.length}</span>
           </section>
         )}
@@ -183,50 +195,87 @@ export function Home() {
           <h2 className="mt-2 font-display text-3xl text-indigo-deep">
             {resolved.track.name}
           </h2>
-          <p className="mt-1 text-sm text-muted">
-            Learning with {metaName}
-          </p>
-          <ol className="mt-6 space-y-3">
-            {(resolved.track.units ?? []).map((unit) => (
-              <li key={unit.position}>
-                {unit.available > 0 ? (
+          <p className="mt-1 text-sm text-muted">Learning with {metaName}</p>
+          <section
+            aria-label="Continue"
+            className="mt-6 rounded-3xl bg-indigo-deep p-6 text-cream shadow-card"
+          >
+            {allUnitsComplete ? (
+              <>
+                <p className="text-xs font-bold uppercase tracking-[.2em] text-lavender">
+                  Path complete
+                </p>
+                <h3 className="mt-2 font-display text-2xl">
+                  Keep your learning fresh
+                </h3>
+                <a
+                  href="#review-due"
+                  className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-cream px-5 font-bold text-indigo-deep"
+                >
+                  Review due
+                </a>
+              </>
+            ) : nextUnit ? (
+              <>
+                <p className="text-xs font-bold uppercase tracking-[.2em] text-lavender">
+                  Continue
+                </p>
+                <h3 className="mt-2 font-display text-3xl">{nextUnit.title}</h3>
+                <p className="mt-1 text-lavender">{modeNames[nextUnit.mode]}</p>
+                {nextUnit.available > 0 ? (
                   <Link
-                    to={`/study/${resolved.track.slug}/${unit.position}`}
-                    className="flex min-h-16 items-center gap-4 rounded-2xl border border-sand bg-white p-4"
+                    to={`/study/${resolved.track.slug}/${nextUnit.position}`}
+                    aria-label={`${nextUnit.progress.done > 0 ? "Continue" : "Start"} ${nextUnit.title}`}
+                    className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-cream px-5 font-bold text-indigo-deep"
                   >
-                    <span className="grid size-10 place-content-center rounded-full bg-ochre-soft font-bold">
-                      {unit.position}
-                    </span>
-                    <span>
-                      <strong className="font-display text-lg text-indigo-deep">
-                        {unit.title}
-                      </strong>
-                      <small className="block text-muted">
-                        {modeNames[unit.mode]} · {unit.available} ready
-                      </small>
-                    </span>
+                    {nextUnit.progress.done > 0 ? "Continue" : "Start"}
                   </Link>
                 ) : (
-                  <div
-                    aria-disabled="true"
-                    className="flex min-h-16 items-center gap-4 rounded-2xl border border-sand bg-white/50 p-4 text-muted"
-                  >
-                    <span className="grid size-10 place-content-center rounded-full bg-sand">
-                      {unit.position}
-                    </span>
-                    <span>
-                      <strong className="font-display text-lg">
-                        {unit.title}
-                      </strong>
-                      <small className="block">
-                        {modeNames[unit.mode]} · Content is being prepared
-                      </small>
-                    </span>
-                  </div>
+                  <p className="mt-4 text-sm text-lavender">
+                    Content is being prepared
+                  </p>
                 )}
-              </li>
-            ))}
-          </ol>
+              </>
+            ) : (
+              <p className="text-lavender">No units are available yet.</p>
+            )}
+          </section>
+          <section
+            aria-label="Full learning path"
+            className="mt-6 border-t border-sand pt-5 text-sm"
+          >
+            <h3 className="font-bold text-indigo-deep">Full learning path</h3>
+            <ol className="mt-3 divide-y divide-sand">
+              {units.map((unit) => (
+                <li key={unit.position}>
+                  {unit.available > 0 ? (
+                    <Link
+                      to={`/study/${resolved.track.slug}/${unit.position}`}
+                      className="flex min-h-12 items-center gap-3 py-3 text-indigo-deep"
+                    >
+                      <span className="w-6 shrink-0 font-bold text-terracotta">
+                        {unit.position}
+                      </span>
+                      <strong>{unit.title}</strong>
+                    </Link>
+                  ) : (
+                    <div
+                      aria-disabled="true"
+                      className="flex min-h-12 items-center gap-3 py-3 text-muted"
+                    >
+                      <span className="w-6 shrink-0">{unit.position}</span>
+                      <span>
+                        <strong>{unit.title}</strong>
+                        <small className="ml-2">
+                          Content is being prepared
+                        </small>
+                      </span>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </section>
         </section>
       </div>
     </main>

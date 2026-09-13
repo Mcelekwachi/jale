@@ -84,6 +84,11 @@ export interface TrackUnit {
   difficulty?: Difficulty | null;
   item_count: number;
   available: number;
+  progress: {
+    done: number;
+    total: number;
+  };
+  completed: boolean;
 }
 
 export interface Track {

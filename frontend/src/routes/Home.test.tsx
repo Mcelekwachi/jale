@@ -24,6 +24,8 @@ const track = {
         mode: "flashcard",
         item_count: 10,
         available: 10,
+        progress: { done: 0, total: 10 },
+        completed: false,
       },
       {
         position: 2,
@@ -31,6 +33,8 @@ const track = {
         mode: "proverbs",
         item_count: 4,
         available: 0,
+        progress: { done: 0, total: 4 },
+        completed: false,
       },
     ],
   },
@@ -40,7 +44,10 @@ const track = {
 describe("Home", () => {
   beforeEach(() => {
     vi.mocked(apiFetch).mockReset();
-    Object.defineProperty(navigator, "share", { configurable: true, value: undefined });
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: undefined,
+    });
   });
 
   it("shows track, due review, progress, and disables unavailable units", async () => {
@@ -64,10 +71,9 @@ describe("Home", () => {
     expect(screen.getByText(/3 day streak/i)).toBeInTheDocument();
     expect(screen.getByText(/today's goal met/i)).toBeInTheDocument();
     expect(screen.getByText(/review due/i)).toHaveTextContent("1");
-    expect(screen.getByRole("link", { name: /greetings/i })).toHaveAttribute(
-      "href",
-      "/study/ibo_foundations/1",
-    );
+    expect(
+      screen.getByRole("link", { name: /start greetings/i }),
+    ).toHaveAttribute("href", "/study/ibo_foundations/1");
     expect(
       screen.queryByRole("link", { name: /proverbs/i }),
     ).not.toBeInTheDocument();
@@ -92,6 +98,118 @@ describe("Home", () => {
     expect(screen.queryByText(/review due/i)).not.toBeInTheDocument();
   });
 
+  it("continues with the first incomplete unit instead of always unit one", async () => {
+    const progressedTrack = {
+      ...track,
+      track: {
+        ...track.track,
+        units: [
+          {
+            ...track.track.units[0],
+            progress: { done: 10, total: 10 },
+            completed: true,
+          },
+          {
+            ...track.track.units[1],
+            title: "Wisdom",
+            available: 4,
+          },
+        ],
+      },
+    };
+    vi.mocked(apiFetch)
+      .mockResolvedValueOnce(progressedTrack as never)
+      .mockResolvedValueOnce({
+        current_streak: 2,
+        today_goal_met: false,
+      } as never)
+      .mockResolvedValueOnce({ items: [] } as never)
+      .mockResolvedValueOnce({ preferences: { meta_language: "eng" } } as never)
+      .mockResolvedValueOnce([{ code: "eng", name: "English" }] as never);
+
+    render(<Home />, { wrapper: MemoryRouter });
+
+    const continueCard = await screen.findByRole("region", {
+      name: /continue/i,
+    });
+    expect(continueCard).toHaveTextContent("Wisdom");
+    expect(continueCard).toHaveTextContent("Proverbs");
+    expect(continueCard).toHaveTextContent("Start");
+    expect(screen.getByRole("link", { name: /start wisdom/i })).toHaveAttribute(
+      "href",
+      "/study/ibo_foundations/2",
+    );
+  });
+
+  it("keeps every unit available in a compact secondary path list", async () => {
+    const availableTrack = {
+      ...track,
+      track: {
+        ...track.track,
+        units: track.track.units.map((unit) => ({
+          ...unit,
+          available: unit.item_count,
+        })),
+      },
+    };
+    vi.mocked(apiFetch)
+      .mockResolvedValueOnce(availableTrack as never)
+      .mockResolvedValueOnce({
+        current_streak: 1,
+        today_goal_met: false,
+      } as never)
+      .mockResolvedValueOnce({ items: [] } as never)
+      .mockResolvedValueOnce({ preferences: { meta_language: "eng" } } as never)
+      .mockResolvedValueOnce([{ code: "eng", name: "English" }] as never);
+
+    render(<Home />, { wrapper: MemoryRouter });
+
+    const path = await screen.findByRole("region", {
+      name: /full learning path/i,
+    });
+    expect(path).toHaveClass("text-sm");
+    expect(path).toHaveTextContent("Greetings");
+    expect(path).toHaveTextContent("Proverbs");
+    expect(screen.getByRole("link", { name: /2.*proverbs/i })).toHaveAttribute(
+      "href",
+      "/study/ibo_foundations/2",
+    );
+  });
+
+  it("points to review due when every unit is complete", async () => {
+    const completedTrack = {
+      ...track,
+      track: {
+        ...track.track,
+        units: track.track.units.map((unit) => ({
+          ...unit,
+          progress: { done: unit.item_count, total: unit.item_count },
+          completed: true,
+        })),
+      },
+    };
+    vi.mocked(apiFetch)
+      .mockResolvedValueOnce(completedTrack as never)
+      .mockResolvedValueOnce({
+        current_streak: 4,
+        today_goal_met: true,
+      } as never)
+      .mockResolvedValueOnce({ items: [{ id: 99 }] } as never)
+      .mockResolvedValueOnce({ preferences: { meta_language: "eng" } } as never)
+      .mockResolvedValueOnce([{ code: "eng", name: "English" }] as never);
+
+    render(<Home />, { wrapper: MemoryRouter });
+
+    const continueCard = await screen.findByRole("region", {
+      name: /continue/i,
+    });
+    expect(continueCard).toHaveTextContent(/path complete/i);
+    expect(screen.getByRole("link", { name: /review due/i })).toHaveAttribute(
+      "href",
+      "#review-due",
+    );
+  });
+
   it("shows queued answers and lets the learner sync them", async () => {
     await answerQueue.add({
       content_id: 7,
@@ -102,16 +220,21 @@ describe("Home", () => {
     const [pending] = await answerQueue.list();
     vi.mocked(apiFetch)
       .mockResolvedValueOnce(track as never)
-      .mockResolvedValueOnce({ current_streak: 1, today_goal_met: true } as never)
+      .mockResolvedValueOnce({
+        current_streak: 1,
+        today_goal_met: true,
+      } as never)
       .mockResolvedValueOnce({ items: [] } as never)
       .mockResolvedValueOnce({ preferences: { meta_language: "eng" } } as never)
       .mockResolvedValueOnce([{ code: "eng", name: "English" }] as never)
       .mockResolvedValueOnce({
-        results: [{
-          content_id: 7,
-          client_answer_id: pending.client_answer_id,
-          status: "accepted",
-        }],
+        results: [
+          {
+            content_id: 7,
+            client_answer_id: pending.client_answer_id,
+            status: "accepted",
+          },
+        ],
         current_streak: 1,
         today_xp: 1,
       } as never);
@@ -125,10 +248,16 @@ describe("Home", () => {
 
   it("shares the learner's public progress URL", async () => {
     const share = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, "share", { configurable: true, value: share });
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: share,
+    });
     vi.mocked(apiFetch)
       .mockResolvedValueOnce(track as never)
-      .mockResolvedValueOnce({ current_streak: 3, today_goal_met: true } as never)
+      .mockResolvedValueOnce({
+        current_streak: 3,
+        today_goal_met: true,
+      } as never)
       .mockResolvedValueOnce({ items: [] } as never)
       .mockResolvedValueOnce({
         display_name: "Ada",
@@ -137,10 +266,14 @@ describe("Home", () => {
       } as never)
       .mockResolvedValueOnce([{ code: "eng", name: "English" }] as never);
     render(<Home />, { wrapper: MemoryRouter });
-    await userEvent.click(await screen.findByRole("button", { name: /share my progress/i }));
-    expect(share).toHaveBeenCalledWith(expect.objectContaining({
-      url: `${window.location.origin}/u/ada-learner`,
-    }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: /share my progress/i }),
+    );
+    expect(share).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: `${window.location.origin}/u/ada-learner`,
+      }),
+    );
   });
 
   it("copies the public progress URL when Web Share is unavailable", async () => {
@@ -151,7 +284,10 @@ describe("Home", () => {
     });
     vi.mocked(apiFetch)
       .mockResolvedValueOnce(track as never)
-      .mockResolvedValueOnce({ current_streak: 3, today_goal_met: true } as never)
+      .mockResolvedValueOnce({
+        current_streak: 3,
+        today_goal_met: true,
+      } as never)
       .mockResolvedValueOnce({ items: [] } as never)
       .mockResolvedValueOnce({
         share_slug: "ada-learner",
@@ -159,8 +295,12 @@ describe("Home", () => {
       } as never)
       .mockResolvedValueOnce([{ code: "eng", name: "English" }] as never);
     render(<Home />, { wrapper: MemoryRouter });
-    await userEvent.click(await screen.findByRole("button", { name: /share my progress/i }));
-    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/u/ada-learner`);
+    await userEvent.click(
+      await screen.findByRole("button", { name: /share my progress/i }),
+    );
+    expect(writeText).toHaveBeenCalledWith(
+      `${window.location.origin}/u/ada-learner`,
+    );
     expect(await screen.findByRole("status")).toHaveTextContent(/link copied/i);
   });
 });
