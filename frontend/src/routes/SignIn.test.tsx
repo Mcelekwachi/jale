@@ -1,10 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SignIn } from "./SignIn";
 import { useAuth } from "../auth/useAuth";
+import { setUiLanguage } from "../i18n/useUiStrings";
 
 vi.mock("../auth/useAuth");
 
@@ -26,6 +27,17 @@ function authValue(
 }
 
 describe("SignIn", () => {
+  beforeEach(() => setUiLanguage("eng"));
+
+  it("renders Dutch interface text for the Dutch meta-language", () => {
+    setUiLanguage("nld");
+    mockedUseAuth.mockReturnValue(authValue());
+    render(<SignIn />, { wrapper: MemoryRouter });
+    expect(
+      screen.getByRole("heading", { name: /log in om verder te gaan/i }),
+    ).toBeInTheDocument();
+  });
+
   it("renders enabled Google sign-in first as the primary action", () => {
     vi.stubEnv("VITE_GOOGLE_ENABLED", "true");
     mockedUseAuth.mockReturnValue(authValue());
@@ -186,10 +198,13 @@ describe("SignIn", () => {
       </MemoryRouter>,
     );
     await userEvent.type(screen.getByLabelText(/email/i), "ada@example.com");
-    await userEvent.click(screen.getByRole("button", { name: /send magic link/i }));
+    await userEvent.click(
+      screen.getByRole("button", { name: /send magic link/i }),
+    );
 
-    expect(screen.getByText(/sign-in requires an internet connection/i))
-      .toBeInTheDocument();
+    expect(
+      screen.getByText(/sign-in requires an internet connection/i),
+    ).toBeInTheDocument();
     expect(signInWithEmail).not.toHaveBeenCalled();
   });
 });
