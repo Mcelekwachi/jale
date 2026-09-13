@@ -48,7 +48,7 @@ export function PublicProfile() {
     return () => {
       active = false;
     };
-  }, [shareSlug]);
+  }, [shareSlug, strings.loadError]);
 
   if (missing)
     return (

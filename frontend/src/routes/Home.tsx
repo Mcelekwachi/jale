@@ -75,7 +75,7 @@ export function Home() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [strings.loadError]);
   if (!data)
     return error ? (
       <main className="p-5">

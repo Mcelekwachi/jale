@@ -30,7 +30,7 @@ export function AuthCallback() {
         });
       }
     })();
-  }, [navigate]);
+  }, [navigate, strings.completeSignInError]);
 
   return <Spinner label={strings.completingSignIn} fullScreen />;
 }

@@ -99,7 +99,7 @@ export function Settings() {
     return () => {
       active = false;
     };
-  }, [browserTimezone]);
+  }, [browserTimezone, strings.loadError]);
 
   async function update(
     field: keyof UserPreferences,
