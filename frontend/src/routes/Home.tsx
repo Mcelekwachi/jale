@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { Spinner } from "../components/Spinner";
 import { apiFetch } from "../lib/api";
+import { setUiLanguage, useUiStrings } from "../i18n/useUiStrings";
 import type {
   DueStudyItems,
   MetaLanguage,
@@ -12,14 +13,14 @@ import type {
 } from "../lib/types";
 import { answerQueue } from "../study/answerQueueService";
 
-const modeNames = {
-  flashcard: "Flashcards",
-  quiz: "Quiz",
-  phrase_practice: "Phrase practice",
-  proverbs: "Proverbs",
-};
-
 export function Home() {
+  const strings = useUiStrings().home;
+  const modeNames = {
+    flashcard: strings.flashcards,
+    quiz: strings.quiz,
+    phrase_practice: strings.phrasePractice,
+    proverbs: strings.proverbs,
+  };
   const [data, setData] = useState<{
     track: ResolvedTrack;
     stats: UserStats;
@@ -59,17 +60,16 @@ export function Home() {
       apiFetch<UserProfile>("/v1/me", options),
       apiFetch<MetaLanguage[]>("/v1/languages/meta", options),
     ])
-      .then(
-        ([track, stats, due, profile, languages]) =>
-          active && setData({ track, stats, due, profile, languages }),
-      )
+      .then(([track, stats, due, profile, languages]) => {
+        if (!active) return;
+        setUiLanguage(profile.preferences.meta_language);
+        setData({ track, stats, due, profile, languages });
+      })
       .catch(
         (caught: unknown) =>
           active &&
           setError(
-            caught instanceof Error
-              ? caught.message
-              : "We could not load your home screen",
+            caught instanceof Error ? caught.message : strings.loadError,
           ),
       );
     return () => {
@@ -83,7 +83,7 @@ export function Home() {
       </main>
     ) : (
       <Spinner
-        label={slow ? "Waking the server…" : "Loading your Igbo path"}
+        label={slow ? strings.wakingServer : strings.loadingPath}
         fullScreen
       />
     );
@@ -105,21 +105,19 @@ export function Home() {
             className="inline-flex min-h-11 items-center px-3 font-semibold text-indigo-deep"
             to="/settings"
           >
-            Settings
+            {strings.settings}
           </Link>
         </header>
         <section className="rounded-[2rem] bg-indigo-deep p-6 text-cream shadow-card">
           {stats.current_streak === 0 ? (
-            <h1 className="font-display text-3xl">Start your streak today</h1>
+            <h1 className="font-display text-3xl">{strings.startStreak}</h1>
           ) : (
             <h1 className="font-display text-3xl">
-              {stats.current_streak} day streak
+              {stats.current_streak} {strings.dayStreak}
             </h1>
           )}
           <p className="mt-2 text-lavender">
-            {stats.today_goal_met
-              ? "✓ Today's goal met"
-              : "Keep going to meet today's goal"}
+            {stats.today_goal_met ? strings.goalMet : strings.keepGoing}
           </p>
           {profile.share_slug && (
             <button
@@ -128,8 +126,8 @@ export function Home() {
               onClick={() => {
                 const url = `${window.location.origin}/u/${profile.share_slug}`;
                 const shareData = {
-                  title: "My Jalɛ progress",
-                  text: `${profile.display_name || "A Jalɛ learner"}'s learning progress`,
+                  title: strings.shareTitle,
+                  text: `${profile.display_name || strings.learner} — ${strings.learningProgress}`,
                   url,
                 };
                 if (navigator.share) {
@@ -137,11 +135,11 @@ export function Home() {
                 } else {
                   void navigator.clipboard
                     .writeText(url)
-                    .then(() => setShareMessage("Profile link copied"));
+                    .then(() => setShareMessage(strings.linkCopied));
                 }
               }}
             >
-              Share my progress
+              {strings.shareProgress}
             </button>
           )}
           {shareMessage && (
@@ -154,8 +152,8 @@ export function Home() {
           <section className="flex min-h-14 items-center justify-between gap-4 rounded-2xl bg-ochre-soft px-5 text-indigo-deep">
             <span className="font-bold">
               {pendingAnswers > 0
-                ? `${pendingAnswers} pending answer${pendingAnswers === 1 ? "" : "s"}`
-                : "All answers synced"}
+                ? `${pendingAnswers} ${pendingAnswers === 1 ? strings.pendingAnswer : strings.pendingAnswers}`
+                : strings.answersSynced}
             </span>
             {pendingAnswers > 0 && (
               <button
@@ -175,7 +173,7 @@ export function Home() {
                     .finally(() => setSyncing(false));
                 }}
               >
-                {syncing ? "Syncing…" : "Sync now"}
+                {syncing ? strings.syncing : strings.syncNow}
               </button>
             )}
           </section>
@@ -185,66 +183,68 @@ export function Home() {
             id="review-due"
             className="flex min-h-14 items-center justify-between rounded-2xl bg-ochre-soft px-5 font-bold text-indigo-deep"
           >
-            Review due <span>{due.items.length}</span>
+            {strings.reviewDue} <span>{due.items.length}</span>
           </section>
         )}
         <section className="rounded-[2rem] bg-cream p-6 shadow-card">
           <p className="text-xs font-bold uppercase tracking-[.2em] text-terracotta">
-            Your learning path
+            {strings.learningPath}
           </p>
           <h2 className="mt-2 font-display text-3xl text-indigo-deep">
             {resolved.track.name}
           </h2>
-          <p className="mt-1 text-sm text-muted">Learning with {metaName}</p>
+          <p className="mt-1 text-sm text-muted">
+            {strings.learningWith} {metaName}
+          </p>
           <section
-            aria-label="Continue"
+            aria-label={strings.continueCta}
             className="mt-6 rounded-3xl bg-indigo-deep p-6 text-cream shadow-card"
           >
             {allUnitsComplete ? (
               <>
                 <p className="text-xs font-bold uppercase tracking-[.2em] text-lavender">
-                  Path complete
+                  {strings.pathComplete}
                 </p>
                 <h3 className="mt-2 font-display text-2xl">
-                  Keep your learning fresh
+                  {strings.keepFresh}
                 </h3>
                 {due.items.length > 0 ? (
                   <a
                     href="#review-due"
                     className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-cream px-5 font-bold text-indigo-deep"
                   >
-                    Review due
+                    {strings.reviewDue}
                   </a>
                 ) : (
-                  <p className="mt-4 text-lavender">
-                    Nothing to review right now
-                  </p>
+                  <p className="mt-4 text-lavender">{strings.nothingDue}</p>
                 )}
               </>
             ) : nextUnit ? (
               <>
                 <p className="text-xs font-bold uppercase tracking-[.2em] text-lavender">
-                  Continue
+                  {strings.continueCta}
                 </p>
                 <h3 className="mt-2 font-display text-3xl">{nextUnit.title}</h3>
                 <p className="mt-1 text-lavender">{modeNames[nextUnit.mode]}</p>
                 <Link
                   to={`/study/${resolved.track.slug}/${nextUnit.position}`}
-                  aria-label={`${nextUnit.progress.done > 0 ? "Continue" : "Start"} ${nextUnit.title}`}
+                  aria-label={`${nextUnit.progress.done > 0 ? strings.continueCta : strings.start} ${nextUnit.title}`}
                   className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-cream px-5 font-bold text-indigo-deep"
                 >
-                  {nextUnit.progress.done > 0 ? "Continue" : "Start"}
+                  {nextUnit.progress.done > 0
+                    ? strings.continueCta
+                    : strings.start}
                 </Link>
               </>
             ) : (
-              <p className="text-lavender">No units are available yet.</p>
+              <p className="text-lavender">{strings.noUnits}</p>
             )}
           </section>
           <section
-            aria-label="Full learning path"
+            aria-label={strings.fullPath}
             className="mt-6 border-t border-sand pt-5 text-sm"
           >
-            <h3 className="font-bold text-indigo-deep">Full learning path</h3>
+            <h3 className="font-bold text-indigo-deep">{strings.fullPath}</h3>
             <ol className="mt-3 divide-y divide-sand">
               {units.map((unit) => (
                 <li key={unit.position}>

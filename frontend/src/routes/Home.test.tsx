@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { apiFetch } from "../lib/api";
 import { answerQueue } from "../study/answerQueueService";
 import { Home } from "./Home";
+import { setUiLanguage } from "../i18n/useUiStrings";
 
 vi.mock("../auth/useAuth", () => ({ useAuth: () => ({ signOut: vi.fn() }) }));
 vi.mock("../lib/api");
@@ -43,11 +44,29 @@ const track = {
 
 describe("Home", () => {
   beforeEach(() => {
+    setUiLanguage("eng");
     vi.mocked(apiFetch).mockReset();
     Object.defineProperty(navigator, "share", {
       configurable: true,
       value: undefined,
     });
+  });
+
+  it("renders Dutch interface text for the Dutch meta-language", async () => {
+    vi.mocked(apiFetch)
+      .mockResolvedValueOnce(track as never)
+      .mockResolvedValueOnce({
+        current_streak: 1,
+        today_goal_met: false,
+      } as never)
+      .mockResolvedValueOnce({ items: [] } as never)
+      .mockResolvedValueOnce({ preferences: { meta_language: "nld" } } as never)
+      .mockResolvedValueOnce([{ code: "nld", name: "Dutch" }] as never);
+    render(<Home />, { wrapper: MemoryRouter });
+    expect(
+      await screen.findByRole("link", { name: /instellingen/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Je leerpad")).toBeInTheDocument();
   });
 
   it("shows track, due review, progress, and keeps every unit accessible", async () => {
@@ -58,8 +77,8 @@ describe("Home", () => {
         today_goal_met: true,
       } as never)
       .mockResolvedValueOnce({ items: [{ id: 99 }] } as never)
-      .mockResolvedValueOnce({ preferences: { meta_language: "nld" } } as never)
-      .mockResolvedValueOnce([{ code: "nld", name: "Dutch" }] as never);
+      .mockResolvedValueOnce({ preferences: { meta_language: "eng" } } as never)
+      .mockResolvedValueOnce([{ code: "eng", name: "Dutch" }] as never);
 
     render(
       <MemoryRouter>
