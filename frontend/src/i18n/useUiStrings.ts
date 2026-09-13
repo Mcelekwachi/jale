@@ -69,3 +69,7 @@ export function useUiStrings(): UiStrings {
   const language = useUiLanguage();
   return language === "nld" ? dutch : en;
 }
+
+export function getUiStrings(): UiStrings {
+  return currentLanguage === "nld" ? dutch : en;
+}

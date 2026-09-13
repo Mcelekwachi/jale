@@ -20,6 +20,9 @@ export const en = {
     profileLoadError: "Unable to load your profile",
     wakingServer: "Waking the server…",
     loadingJourney: "Loading your journey",
+    startupError: "The frontend could not start",
+    startupHeading: "Jalɛ could not start",
+    startupHelp: "Check frontend environment configuration and reload.",
   },
   signIn: {
     offline: "Sign-in requires an internet connection.",
@@ -186,6 +189,7 @@ export const en = {
     timezone: "Timezone",
     ianaTimezone: "IANA timezone",
     saveTimezone: "Save timezone",
+    translated: "translated",
   },
   publicProfile: {
     loadError: "Could not load this profile",

@@ -26,6 +26,9 @@ export const nl = {
     profileLoadError: "Je profiel laden is niet gelukt",
     wakingServer: "De server wordt wakker…",
     loadingJourney: "Je leerreis laden",
+    startupError: "De app kon niet starten",
+    startupHeading: "Jalɛ kon niet starten",
+    startupHelp: "Controleer de frontendconfiguratie en laad opnieuw.",
   },
   signIn: {
     offline: "Je hebt internet nodig om in te loggen.",
@@ -190,6 +193,7 @@ export const nl = {
     timezone: "Tijdzone",
     ianaTimezone: "IANA-tijdzone",
     saveTimezone: "Tijdzone opslaan",
+    translated: "vertaald",
   },
   publicProfile: {
     loadError: "Dit profiel laden is niet gelukt",
