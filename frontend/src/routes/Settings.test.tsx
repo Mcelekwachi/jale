@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../App";
 import { apiFetch } from "../lib/api";
+import { setUiLanguage } from "../i18n/useUiStrings";
 
 vi.mock("../auth/AuthProvider", () => ({
   AuthProvider: ({ children }: { children: React.ReactNode }) => children,
@@ -17,6 +18,7 @@ const mockedApiFetch = vi.mocked(apiFetch);
 
 describe("settings", () => {
   beforeEach(() => {
+    setUiLanguage("eng");
     mockedApiFetch.mockImplementation(async (path) => {
       if (path === "/v1/languages/meta") {
         return [
@@ -52,6 +54,26 @@ describe("settings", () => {
         },
       } as never;
     });
+  });
+
+  it("renders Dutch interface text for the Dutch meta-language", async () => {
+    mockedApiFetch.mockImplementation(async (path) => {
+      if (path === "/v1/languages/meta") return [] as never;
+      return {
+        preferences: {
+          meta_language: "nld",
+          reminder_enabled: false,
+          timezone: "Europe/Amsterdam",
+          placement_skipped: false,
+          onboarding_status: "completed",
+        },
+      } as never;
+    });
+    window.history.replaceState({}, "", "/settings");
+    render(<App />);
+    expect(
+      await screen.findByRole("heading", { name: "Instellingen" }),
+    ).toBeInTheDocument();
   });
 
   it("shows coverage and patches explanation language as a code only", async () => {
@@ -105,8 +127,12 @@ describe("settings", () => {
     window.history.replaceState({}, "", "/settings");
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Settings" }),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Teach my children")).not.toBeInTheDocument();
-    expect(screen.queryByText("Igbo parent born abroad")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Igbo parent born abroad"),
+    ).not.toBeInTheDocument();
   });
 });
