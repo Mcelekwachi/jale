@@ -217,6 +217,24 @@ class ResolvedTrack(BaseModel):
     )
 
 
+class UnitProgress(BaseModel):
+    done: int
+    total: int
+
+
+class UserTrackUnit(TrackUnit):
+    completed: bool
+    progress: UnitProgress
+
+
+class UserTrack(Track):
+    units: list[UserTrackUnit] = []
+
+
+class ResolvedUserTrack(ResolvedTrack):
+    track: UserTrack
+
+
 class QuizOption(BaseModel):
     text: str
     is_correct: bool

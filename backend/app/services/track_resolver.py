@@ -11,6 +11,8 @@ track, so there is no such thing as an unresolvable user.
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from app.db import fetch_all, fetch_one
 
 _RESOLVE_SQL = """
@@ -67,6 +69,55 @@ SELECT u.position, u.title, u.mode,
  ORDER BY u.position
 """
 
+_USER_UNITS_SQL = """
+WITH units AS (
+    SELECT u.position, u.title, u.mode,
+           cat.slug AS category,
+           u.filter_category_id,
+           u.filter_content_type AS content_type,
+           u.filter_difficulty AS difficulty,
+           u.item_count,
+           t.language_id,
+           (SELECT count(*)
+              FROM content_items c
+             WHERE c.language_id = t.language_id
+               AND c.status = 'published'
+               AND (u.filter_category_id IS NULL OR c.category_id = u.filter_category_id)
+               AND (u.filter_content_type IS NULL OR c.content_type = u.filter_content_type)
+               AND (u.filter_difficulty IS NULL OR c.difficulty_level = u.filter_difficulty)
+           ) AS available
+      FROM track_units u
+      JOIN tracks t ON t.id = u.track_id
+      JOIN languages l ON l.id = t.language_id
+      LEFT JOIN categories cat ON cat.id = u.filter_category_id
+     WHERE l.code = %(language)s AND t.slug = %(slug)s
+)
+SELECT u.position, u.title, u.mode, u.category, u.content_type, u.difficulty,
+       u.item_count, u.available,
+       count(items.id)::int AS total,
+       count(items.id) FILTER (WHERE progress.times_correct >= 1)::int AS done,
+       count(items.id) > 0
+       AND count(items.id) FILTER (WHERE progress.times_correct >= 1) = count(items.id)
+           AS completed
+  FROM units u
+  LEFT JOIN LATERAL (
+      SELECT c.id
+        FROM content_items c
+       WHERE c.language_id = u.language_id
+         AND c.status = 'published'
+         AND (u.filter_category_id IS NULL OR c.category_id = u.filter_category_id)
+         AND (u.content_type IS NULL OR c.content_type = u.content_type)
+         AND (u.difficulty IS NULL OR c.difficulty_level = u.difficulty)
+       ORDER BY c.sort_order, c.id
+       LIMIT u.item_count
+  ) items ON true
+  LEFT JOIN user_progress progress
+         ON progress.user_id = %(user_id)s AND progress.content_id = items.id
+ GROUP BY u.position, u.title, u.mode, u.category, u.content_type, u.difficulty,
+          u.item_count, u.available
+ ORDER BY u.position
+"""
+
 
 async def list_tracks(language: str) -> list[dict]:
     return await fetch_all(_TRACKS_SQL, {"language": language})
@@ -78,6 +129,20 @@ async def get_track(language: str, slug: str) -> dict | None:
 
 async def get_units(language: str, slug: str) -> list[dict]:
     return await fetch_all(_UNITS_SQL, {"language": language, "slug": slug})
+
+
+async def get_units_with_progress(language: str, slug: str, user_id: UUID) -> list[dict]:
+    rows = await fetch_all(
+        _USER_UNITS_SQL,
+        {"language": language, "slug": slug, "user_id": user_id},
+    )
+    return [
+        {
+            **{key: value for key, value in row.items() if key not in {"done", "total"}},
+            "progress": {"done": row["done"], "total": row["total"]},
+        }
+        for row in rows
+    ]
 
 
 async def resolve(

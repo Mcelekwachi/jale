@@ -39,6 +39,35 @@ def auth_row_counts(database_url: str, user_id: uuid.UUID) -> tuple[int, int, in
         ).fetchone()
 
 
+def unit_content_ids(database_url: str, track_slug: str, position: int) -> list[int]:
+    with db_connection(database_url) as conn:
+        rows = conn.execute(
+            """
+            SELECT item.id
+              FROM track_units unit
+              JOIN tracks track ON track.id = unit.track_id
+              JOIN LATERAL (
+                  SELECT content.id
+                    FROM content_items content
+                   WHERE content.language_id = track.language_id
+                     AND content.status = 'published'
+                     AND (unit.filter_category_id IS NULL
+                          OR content.category_id = unit.filter_category_id)
+                     AND (unit.filter_content_type IS NULL
+                          OR content.content_type = unit.filter_content_type)
+                     AND (unit.filter_difficulty IS NULL
+                          OR content.difficulty_level = unit.filter_difficulty)
+                   ORDER BY content.sort_order, content.id
+                   LIMIT unit.item_count
+              ) item ON true
+             WHERE track.slug = %s AND unit.position = %s
+             ORDER BY item.id
+            """,
+            (track_slug, position),
+        ).fetchall()
+    return [row[0] for row in rows]
+
+
 async def test_settings_require_supabase_project_url(monkeypatch):
     from app.config import Settings
 
@@ -789,6 +818,76 @@ async def test_new_user_authenticated_track_resolves_default_foundations(
         assert resolved["is_fallback"] is True
 
 
+async def test_authenticated_track_reports_correct_once_progress_even_out_of_order(
+    client, database_url, user_id, auth_headers
+):
+    headers = auth_headers(subject=user_id)
+    with remove_test_users(database_url, user_id):
+        initial = await client.get("/v1/me/track", headers=headers)
+        assert initial.status_code == 200
+        initial_units = initial.json()["track"]["units"]
+        first, second = initial_units[:2]
+        assert first["progress"] == {"done": 0, "total": first["item_count"]}
+        assert first["completed"] is False
+        assert second["progress"] == {"done": 0, "total": second["item_count"]}
+        assert second["completed"] is False
+
+        first_ids = unit_content_ids(database_url, "ibo_foundations", first["position"])
+        with db_connection(database_url) as conn:
+            conn.execute(
+                """
+                INSERT INTO user_progress(user_id, content_id, times_seen, times_correct)
+                VALUES (%s, %s, 1, 0)
+                """,
+                (user_id, first_ids[0]),
+            )
+
+        seen_only = await client.get("/v1/me/track", headers=headers)
+        seen_only_first = seen_only.json()["track"]["units"][0]
+        assert seen_only_first["progress"]["done"] == 0
+        assert seen_only_first["completed"] is False
+
+        second_ids = unit_content_ids(database_url, "ibo_foundations", second["position"])
+        with db_connection(database_url) as conn:
+            conn.executemany(
+                """
+                INSERT INTO user_progress(user_id, content_id, times_seen, times_correct)
+                VALUES (%s, %s, 1, 1)
+                """,
+                [(user_id, content_id) for content_id in second_ids],
+            )
+
+        out_of_order = await client.get("/v1/me/track", headers=headers)
+        out_of_order_units = out_of_order.json()["track"]["units"]
+        assert out_of_order_units[0]["progress"]["done"] == 0
+        assert out_of_order_units[0]["completed"] is False
+        assert out_of_order_units[1]["progress"] == {
+            "done": len(second_ids),
+            "total": len(second_ids),
+        }
+        assert out_of_order_units[1]["completed"] is True
+
+        with db_connection(database_url) as conn:
+            conn.executemany(
+                """
+                INSERT INTO user_progress(user_id, content_id, times_seen, times_correct)
+                VALUES (%s, %s, 1, 1)
+                ON CONFLICT (user_id, content_id) DO UPDATE
+                    SET times_seen = EXCLUDED.times_seen,
+                        times_correct = EXCLUDED.times_correct
+                """,
+                [(user_id, content_id) for content_id in first_ids],
+            )
+
+        advanced = await client.get("/v1/me/track", headers=headers)
+        advanced_first = advanced.json()["track"]["units"][0]
+        assert advanced_first["progress"] == {
+            "done": len(first_ids),
+            "total": len(first_ids),
+        }
+        assert advanced_first["completed"] is True
+
+
 async def test_authenticated_track_uses_only_token_owners_stored_preferences(
     client, database_url, auth_headers
 ):
@@ -813,9 +912,23 @@ async def test_authenticated_track_uses_only_token_owners_stored_preferences(
         other = await client.get("/v1/me/track", headers=other_headers)
 
         assert authenticated.status_code == public.status_code == other.status_code == 200
-        assert authenticated.json() == public.json()
-        assert authenticated.json()["track"]["slug"] == "ibo_native_advanced"
-        assert authenticated.json()["track"]["units"]
-        assert "matched_priority" in authenticated.json()
-        assert authenticated.json()["is_fallback"] is False
+        authenticated_body = authenticated.json()
+        public_body = public.json()
+        assert authenticated_body["track"]["slug"] == public_body["track"]["slug"]
+        assert len(authenticated_body["track"]["units"]) == len(public_body["track"]["units"])
+        for authenticated_unit, public_unit in zip(
+            authenticated_body["track"]["units"], public_body["track"]["units"], strict=True
+        ):
+            assert {key: authenticated_unit[key] for key in public_unit} == public_unit
+            assert authenticated_unit["progress"] == {
+                "done": 0,
+                "total": min(public_unit["available"], public_unit["item_count"]),
+            }
+            assert authenticated_unit["completed"] is False
+            assert "progress" not in public_unit
+            assert "completed" not in public_unit
+        assert authenticated_body["track"]["slug"] == "ibo_native_advanced"
+        assert authenticated_body["track"]["units"]
+        assert "matched_priority" in authenticated_body
+        assert authenticated_body["is_fallback"] is False
         assert other.json()["track"]["slug"] == "ibo_foundations"
