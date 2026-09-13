@@ -848,8 +848,8 @@ async def test_authenticated_track_reports_correct_once_progress_even_out_of_ord
         assert seen_only_first["completed"] is False
 
         second_ids = unit_content_ids(database_url, "ibo_foundations", second["position"])
-        with db_connection(database_url) as conn:
-            conn.executemany(
+        with db_connection(database_url) as conn, conn.cursor() as cur:
+            cur.executemany(
                 """
                 INSERT INTO user_progress(user_id, content_id, times_seen, times_correct)
                 VALUES (%s, %s, 1, 1)
@@ -867,8 +867,8 @@ async def test_authenticated_track_reports_correct_once_progress_even_out_of_ord
         }
         assert out_of_order_units[1]["completed"] is True
 
-        with db_connection(database_url) as conn:
-            conn.executemany(
+        with db_connection(database_url) as conn, conn.cursor() as cur:
+            cur.executemany(
                 """
                 INSERT INTO user_progress(user_id, content_id, times_seen, times_correct)
                 VALUES (%s, %s, 1, 1)
