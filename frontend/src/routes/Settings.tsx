@@ -8,6 +8,11 @@ import { Spinner } from "../components/Spinner";
 import { apiFetch } from "../lib/api";
 import { defaultMetaLanguage } from "../lib/locale";
 import { coverageLabel } from "../lib/languageCoverage";
+import {
+  getUiStrings,
+  setUiLanguage,
+  useUiStrings,
+} from "../i18n/useUiStrings";
 import type { MetaLanguage, UserPreferences, UserProfile } from "../lib/types";
 import { OptionList } from "../onboarding/OptionList";
 import {
@@ -20,6 +25,44 @@ import {
 } from "../onboarding/options";
 
 export function Settings() {
+  const ui = useUiStrings();
+  const strings = ui.settings;
+  const choiceLabels: Record<string, string> = {
+    child_u13: ui.choices.childUnder13,
+    young_adult_13_25: ui.choices.youngAdult,
+    adult_25_plus: ui.choices.adult,
+    complete_beginner: ui.choices.completeBeginner,
+    language_enthusiast: ui.choices.languageEnthusiast,
+    connected_to_igbo_family: ui.choices.connectedFamily,
+    igbo_heritage_speaker: ui.choices.heritageSpeaker,
+    igbo_parent_abroad: ui.choices.parentAbroad,
+    mixed_parent_abroad: ui.choices.mixedParent,
+    aboriginal_native: ui.choices.nativeSpeaker,
+    other_african_heritage: ui.choices.otherAfricanHeritage,
+    family_and_culture: ui.choices.familyCulture,
+    teach_my_children: ui.choices.teachChildren,
+    visiting_nigeria: ui.choices.visitingNigeria,
+    academic_professional: ui.choices.academic,
+    cultural_pride: ui.choices.culturalPride,
+    new_language: ui.choices.newLanguage,
+    improve_proverbs_vocab: ui.choices.improveProverbs,
+    game_points: ui.choices.games,
+    structured_lessons: ui.choices.structured,
+    mixed: ui.choices.mixed,
+    5: ui.choices.fiveMinutes,
+    15: ui.choices.fifteenMinutes,
+    30: ui.choices.thirtyMinutes,
+    beginner: ui.choices.beginner,
+    intermediate: ui.choices.intermediate,
+    advanced: ui.choices.advanced,
+  };
+  const localize = <T extends string | number>(
+    choices: { label: string; value: T }[],
+  ) =>
+    choices.map((choice) => ({
+      ...choice,
+      label: choiceLabels[String(choice.value)] ?? choice.label,
+    }));
   const { signOut } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [languages, setLanguages] = useState<MetaLanguage[]>([]);
@@ -45,6 +88,7 @@ export function Settings() {
     ])
       .then(([nextProfile, nextLanguages]) => {
         if (!active) return;
+        setUiLanguage(nextProfile.preferences.meta_language);
         setProfile(nextProfile);
         setLanguages(nextLanguages);
         setTimezone(nextProfile.preferences.timezone || browserTimezone);
@@ -55,7 +99,7 @@ export function Settings() {
           setError(
             caught instanceof Error
               ? caught.message
-              : "Unable to load settings",
+              : getUiStrings().settings.loadError,
           ),
       );
     return () => {
@@ -76,6 +120,7 @@ export function Settings() {
         body: JSON.stringify({ [field]: value }),
         onSlowChange: setSlow,
       });
+      if (field === "meta_language") setUiLanguage(String(value));
       setProfile((current) =>
         current
           ? {
@@ -85,11 +130,7 @@ export function Settings() {
           : current,
       );
     } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "Unable to save this setting",
-      );
+      setError(caught instanceof Error ? caught.message : strings.saveError);
     } finally {
       setSaving(null);
     }
@@ -102,7 +143,7 @@ export function Settings() {
       </main>
     ) : (
       <Spinner
-        label={slow ? "Waking the server…" : "Loading settings"}
+        label={slow ? strings.wakingServer : strings.loading}
         fullScreen
       />
     );
@@ -118,73 +159,72 @@ export function Settings() {
               to="/"
               className="inline-flex min-h-11 items-center font-semibold text-indigo-deep"
             >
-              ← Home
+              {strings.home}
             </Link>
             <h1 className="font-display text-4xl font-semibold text-indigo-deep">
-              Settings
+              {strings.heading}
             </h1>
-            <p className="mt-1 text-sm text-muted">Learning preferences</p>
+            <p className="mt-1 text-sm text-muted">{strings.preferences}</p>
           </div>
           <Button
             className="w-auto"
             variant="secondary"
             onClick={() => void signOut()}
           >
-            Sign out
+            {strings.signOut}
           </Button>
         </header>
         {slow && saving && (
           <p role="status" className="text-sm font-semibold text-muted">
-            Waking the server…
+            {strings.wakingServer}
           </p>
         )}
         {error && <ErrorMessage message={error} />}
-        <SettingSection title="Who are you">
+        <SettingSection title={strings.who}>
           <OptionList
-            choices={ageChoices}
+            choices={localize(ageChoices)}
             selected={preferences.age_band}
             disabled={Boolean(saving)}
             onSelect={(value) => void update("age_band", value)}
           />
         </SettingSection>
-        <SettingSection title="Your connection">
+        <SettingSection title={strings.connection}>
           <OptionList
-            choices={connectionChoicesFor(preferences.age_band)}
+            choices={localize(connectionChoicesFor(preferences.age_band))}
             selected={preferences.connection}
             disabled={Boolean(saving)}
             onSelect={(value) => void update("connection", value)}
           />
         </SettingSection>
-        <SettingSection title="Your goal">
+        <SettingSection title={strings.goal}>
           <OptionList
-            choices={goalChoicesFor(
-              preferences.age_band,
-              preferences.connection,
+            choices={localize(
+              goalChoicesFor(preferences.age_band, preferences.connection),
             )}
             selected={preferences.goal}
             disabled={Boolean(saving)}
             onSelect={(value) => void update("goal", value)}
           />
         </SettingSection>
-        <SettingSection title="Learning style">
+        <SettingSection title={strings.style}>
           <OptionList
-            choices={styleChoices}
+            choices={localize(styleChoices)}
             selected={preferences.style}
             disabled={Boolean(saving)}
             onSelect={(value) => void update("style", value)}
           />
         </SettingSection>
-        <SettingSection title="Daily time">
+        <SettingSection title={strings.dailyTime}>
           <OptionList
-            choices={dailyChoices}
+            choices={localize(dailyChoices)}
             selected={preferences.daily_minutes as 5 | 15 | 30 | null}
             disabled={Boolean(saving)}
             onSelect={(value) => void update("daily_minutes", value)}
           />
         </SettingSection>
-        <SettingSection title="Placement level">
+        <SettingSection title={strings.placement}>
           <OptionList
-            choices={placementChoices}
+            choices={localize([...placementChoices])}
             selected={
               preferences.placement_level as
                 "beginner" | "intermediate" | "advanced" | null
@@ -193,10 +233,13 @@ export function Settings() {
             onSelect={(value) => void update("placement_level", value)}
           />
         </SettingSection>
-        <SettingSection title="Explanation language">
+        <SettingSection title={strings.explanationLanguage}>
           <OptionList
             choices={languages.map((language) => ({
-              label: [language.name, coverageLabel(language)]
+              label: [
+                language.name,
+                coverageLabel(language, strings.translated),
+              ]
                 .filter(Boolean)
                 .join(" — "),
               value: language.code,
@@ -206,15 +249,13 @@ export function Settings() {
             onSelect={(value) => void update("meta_language", value)}
           />
           {preferences.meta_language === null && (
-            <p className="mt-3 text-sm text-muted">
-              Following your browser language until you choose.
-            </p>
+            <p className="mt-3 text-sm text-muted">{strings.browserLanguage}</p>
           )}
         </SettingSection>
-        <SettingSection title="Reminder">
+        <SettingSection title={strings.reminder}>
           <div className="space-y-3">
             <label className="grid gap-2 font-semibold text-indigo-deep">
-              Reminder time
+              {strings.reminderTime}
               <input
                 type="time"
                 value={(preferences.reminder_time ?? "09:00").slice(0, 5)}
@@ -226,8 +267,8 @@ export function Settings() {
             </label>
             <OptionList
               choices={[
-                { label: "Reminders on", value: "on" },
-                { label: "No reminders", value: "off" },
+                { label: strings.remindersOn, value: "on" },
+                { label: strings.noReminders, value: "off" },
               ]}
               selected={preferences.reminder_enabled ? "on" : "off"}
               disabled={Boolean(saving)}
@@ -237,10 +278,10 @@ export function Settings() {
             />
           </div>
         </SettingSection>
-        <SettingSection title="Timezone">
+        <SettingSection title={strings.timezone}>
           <div className="space-y-3">
             <label className="grid gap-2 font-semibold text-indigo-deep">
-              IANA timezone
+              {strings.ianaTimezone}
               <input
                 value={timezone}
                 onChange={(event) => setTimezone(event.target.value)}
@@ -251,7 +292,7 @@ export function Settings() {
               busy={saving === "timezone"}
               onClick={() => void update("timezone", timezone)}
             >
-              Save timezone
+              {strings.saveTimezone}
             </Button>
           </div>
         </SettingSection>

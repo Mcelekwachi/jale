@@ -1,12 +1,13 @@
+import { useUiStrings } from "../i18n/useUiStrings";
+
 interface SpinnerProps {
   label?: string;
   fullScreen?: boolean;
 }
 
-export function Spinner({
-  label = "Loading",
-  fullScreen = false,
-}: SpinnerProps) {
+export function Spinner({ label, fullScreen = false }: SpinnerProps) {
+  const strings = useUiStrings().shared;
+  const resolvedLabel = label ?? strings.loading;
   return (
     <div
       className={
@@ -17,11 +18,11 @@ export function Spinner({
     >
       <div
         role="status"
-        aria-label={label}
+        aria-label={resolvedLabel}
         className="grid justify-items-center gap-3 text-indigo-deep"
       >
         <span className="size-9 animate-spin rounded-full border-4 border-ochre-soft border-t-indigo-deep motion-reduce:animate-none" />
-        <span className="text-sm font-semibold">{label}</span>
+        <span className="text-sm font-semibold">{resolvedLabel}</span>
       </div>
     </div>
   );

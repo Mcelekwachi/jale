@@ -3,10 +3,12 @@ import { Navigate, Outlet } from "react-router-dom";
 
 import { ErrorMessage } from "../components/ErrorMessage";
 import { Spinner } from "../components/Spinner";
+import { getUiStrings, useUiStrings } from "../i18n/useUiStrings";
 import { apiFetch } from "../lib/api";
 import type { UserProfile } from "../lib/types";
 
 export function OnboardingGuard() {
+  const strings = useUiStrings().shared;
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [slow, setSlow] = useState(false);
@@ -24,7 +26,7 @@ export function OnboardingGuard() {
           setError(
             caught instanceof Error
               ? caught.message
-              : "Unable to load your profile",
+              : getUiStrings().shared.profileLoadError,
           ),
       );
     return () => {
@@ -41,7 +43,7 @@ export function OnboardingGuard() {
   if (!profile)
     return (
       <Spinner
-        label={slow ? "Waking the server…" : "Loading your journey"}
+        label={slow ? strings.wakingServer : strings.loadingJourney}
         fullScreen
       />
     );

@@ -17,11 +17,31 @@ const mockedApiFetch = vi.mocked(apiFetch);
 
 const catalogue = {
   learnable: [
-    { code: "ibo", name: "Igbo", endonym: "Asụsụ Igbo", available: true, content_count: 157 },
+    {
+      code: "ibo",
+      name: "Igbo",
+      endonym: "Asụsụ Igbo",
+      available: true,
+      content_count: 157,
+    },
   ],
   meta: [
-    { code: "eng", name: "English", endonym: "English", available: true, translated_count: 157, total_count: 157 },
-    { code: "nld", name: "Dutch", endonym: "Nederlands", available: true, translated_count: 0, total_count: 157 },
+    {
+      code: "eng",
+      name: "English",
+      endonym: "English",
+      available: true,
+      translated_count: 157,
+      total_count: 157,
+    },
+    {
+      code: "nld",
+      name: "Dutch",
+      endonym: "Nederlands",
+      available: true,
+      translated_count: 0,
+      total_count: 157,
+    },
   ],
 };
 
@@ -144,7 +164,9 @@ describe("onboarding", () => {
     ).toBeInTheDocument();
 
     await userEvent.selectOptions(meta, "nld");
-    expect(screen.getByText(/Dutch translations are still being written/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Dutch translations are still being written/i),
+    ).toBeInTheDocument();
 
     await userEvent.selectOptions(target, "hau");
     expect(meta).toHaveValue("nld");
@@ -255,7 +277,9 @@ describe("onboarding", () => {
         return profile({ onboarding_status: "skipped" }) as never;
       }
       if (path === "/v1/me")
-        return profile({ onboarding_status: skipped ? "skipped" : "not_started" }) as never;
+        return profile({
+          onboarding_status: skipped ? "skipped" : "not_started",
+        }) as never;
       if (path === "/v1/languages/catalogue") return catalogue as never;
       return profile() as never;
     });
@@ -354,15 +378,15 @@ describe("onboarding", () => {
     });
     renderPath("/onboarding/10");
 
-    expect(await screen.findByText("Visiting Nigeria")).toBeInTheDocument();
-    expect(screen.getByText("Igbo with Dutch")).toBeInTheDocument();
-    expect(screen.getByText("15 minutes")).toBeInTheDocument();
+    expect(await screen.findByText("Nigeria bezoeken")).toBeInTheDocument();
+    expect(screen.getByText("Igbo met Dutch")).toBeInTheDocument();
+    expect(screen.getByText("15 minuten")).toBeInTheDocument();
     expect(mockedApiFetch).not.toHaveBeenCalledWith(
       "/v1/me/onboarding/complete",
       expect.anything(),
     );
     await userEvent.click(
-      screen.getByRole("button", { name: /start learning/i }),
+      screen.getByRole("button", { name: /begin met leren/i }),
     );
     expect(mockedApiFetch).toHaveBeenCalledWith(
       "/v1/me/onboarding/complete",
@@ -387,8 +411,12 @@ describe("onboarding", () => {
 
   it("marks screen transitions as disabled for reduced motion", async () => {
     renderPath("/onboarding/3");
-    const heading = await screen.findByRole("heading", { name: /who are you/i });
-    expect(heading.closest("section")).toHaveClass("motion-reduce:animate-none");
+    const heading = await screen.findByRole("heading", {
+      name: /who are you/i,
+    });
+    expect(heading.closest("section")).toHaveClass(
+      "motion-reduce:animate-none",
+    );
   });
 
   it("scores two placement answers as intermediate", async () => {
@@ -471,7 +499,12 @@ describe("onboarding", () => {
         return {
           items: [
             {
-              id: difficulty === "beginner" ? 11 : difficulty === "intermediate" ? 21 : 31,
+              id:
+                difficulty === "beginner"
+                  ? 11
+                  : difficulty === "intermediate"
+                    ? 21
+                    : 31,
               content_type: "word",
               target_text: `Prompt ${difficulty}`,
               translation: `Right ${difficulty}`,
@@ -507,7 +540,9 @@ describe("onboarding", () => {
     );
 
     expect(
-      screen.getByRole("button", { name: /I'm not sure.*Your answer.*Not sure/i }),
+      screen.getByRole("button", {
+        name: /I'm not sure.*Your answer.*Not sure/i,
+      }),
     ).toHaveClass("bg-[#eee9df]");
     expect(
       screen.getByRole("button", { name: /Right beginner.*Correct answer/i }),
@@ -518,7 +553,9 @@ describe("onboarding", () => {
       screen.getByRole("button", { name: "Right intermediate" }),
     );
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-    await userEvent.click(screen.getByRole("button", { name: "Right advanced" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Right advanced" }),
+    );
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     expect(mockedApiFetch).toHaveBeenCalledWith(

@@ -8,9 +8,11 @@ import { Spinner } from "../components/Spinner";
 import { apiFetch } from "../lib/api";
 import { defaultMetaLanguage } from "../lib/locale";
 import {
-  coverageLabel,
-  hasIncompleteCoverage,
-} from "../lib/languageCoverage";
+  getUiStrings,
+  setUiLanguage,
+  useUiStrings,
+} from "../i18n/useUiStrings";
+import { coverageLabel, hasIncompleteCoverage } from "../lib/languageCoverage";
 import type {
   CatalogueLanguage,
   ContentItem,
@@ -30,19 +32,6 @@ import {
 
 type PreferenceChanges = Record<string, string | number | boolean | null>;
 type QuizQuestion = { item: ContentItem; options: string[] };
-
-const headings = [
-  "Nnọọ",
-  "Choose your languages",
-  "Who are you",
-  "Your connection",
-  "Your goal",
-  "Learning style",
-  "Daily time",
-  "Reminder",
-  "Placement check",
-  "Ready to begin",
-];
 
 function quizQuestion(page: ContentPage): QuizQuestion | null {
   for (const item of page.items) {
@@ -64,6 +53,53 @@ function quizQuestion(page: ContentPage): QuizQuestion | null {
 }
 
 export function Onboarding() {
+  const ui = useUiStrings();
+  const strings = ui.onboarding;
+  const headings = [
+    "Nnọọ",
+    strings.chooseLanguages,
+    strings.who,
+    strings.connection,
+    strings.goal,
+    strings.style,
+    strings.dailyTime,
+    strings.reminder,
+    strings.placement,
+    strings.ready,
+  ];
+  const choiceLabels: Record<string, string> = {
+    child_u13: ui.choices.childUnder13,
+    young_adult_13_25: ui.choices.youngAdult,
+    adult_25_plus: ui.choices.adult,
+    complete_beginner: ui.choices.completeBeginner,
+    language_enthusiast: ui.choices.languageEnthusiast,
+    connected_to_igbo_family: ui.choices.connectedFamily,
+    igbo_heritage_speaker: ui.choices.heritageSpeaker,
+    igbo_parent_abroad: ui.choices.parentAbroad,
+    mixed_parent_abroad: ui.choices.mixedParent,
+    aboriginal_native: ui.choices.nativeSpeaker,
+    other_african_heritage: ui.choices.otherAfricanHeritage,
+    family_and_culture: ui.choices.familyCulture,
+    teach_my_children: ui.choices.teachChildren,
+    visiting_nigeria: ui.choices.visitingNigeria,
+    academic_professional: ui.choices.academic,
+    cultural_pride: ui.choices.culturalPride,
+    new_language: ui.choices.newLanguage,
+    improve_proverbs_vocab: ui.choices.improveProverbs,
+    game_points: ui.choices.games,
+    structured_lessons: ui.choices.structured,
+    mixed: ui.choices.mixed,
+    5: ui.choices.fiveMinutes,
+    15: ui.choices.fifteenMinutes,
+    30: ui.choices.thirtyMinutes,
+  };
+  const localize = <T extends string | number>(
+    choices: { label: string; value: T }[],
+  ) =>
+    choices.map((choice) => ({
+      ...choice,
+      label: choiceLabels[String(choice.value)] ?? choice.label,
+    }));
   const navigate = useNavigate();
   const { step: rawStep } = useParams();
   const step = Number(rawStep ?? 1);
@@ -87,6 +123,7 @@ export function Onboarding() {
     })
       .then((value) => {
         if (!active) return;
+        setUiLanguage(value.preferences.meta_language);
         setProfile(value);
         if (value.preferences.reminder_time)
           setTime(value.preferences.reminder_time.slice(0, 5));
@@ -97,7 +134,7 @@ export function Onboarding() {
           setError(
             caught instanceof Error
               ? caught.message
-              : "Unable to load onboarding",
+              : getUiStrings().onboarding.loadError,
           ),
       );
     return () => {
@@ -112,13 +149,14 @@ export function Onboarding() {
       onSlowChange: (value) => active && setSlow(value),
     })
       .then((value) => active && setCatalogue(value))
-      .catch((caught: unknown) =>
-        active &&
-        setError(
-          caught instanceof Error
-            ? caught.message
-            : "Unable to load the language catalogue",
-        ),
+      .catch(
+        (caught: unknown) =>
+          active &&
+          setError(
+            caught instanceof Error
+              ? caught.message
+              : getUiStrings().onboarding.catalogueError,
+          ),
       );
     return () => {
       active = false;
@@ -141,16 +179,14 @@ export function Onboarding() {
       .then((pages) => {
         const built = pages.map(quizQuestion);
         if (built.some((question) => question === null))
-          throw new Error(
-            "Placement questions are unavailable. You can skip this check.",
-          );
+          throw new Error(getUiStrings().onboarding.placementUnavailable);
         setQuestions(built as QuizQuestion[]);
       })
       .catch((caught: unknown) =>
         setError(
           caught instanceof Error
             ? caught.message
-            : "Unable to load placement questions",
+            : getUiStrings().onboarding.placementError,
         ),
       );
   }, [questions, step]);
@@ -171,6 +207,8 @@ export function Onboarding() {
         body: JSON.stringify({ ...changes, onboarding_last_screen: nextStep }),
         onSlowChange: setSlow,
       });
+      if ("meta_language" in changes)
+        setUiLanguage(String(changes.meta_language));
       setProfile((current) =>
         current
           ? {
@@ -186,11 +224,7 @@ export function Onboarding() {
       setRetry(null);
       navigate(`/onboarding/${nextStep}`);
     } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "We could not save your answer",
-      );
+      setError(caught instanceof Error ? caught.message : strings.saveError);
       setRetry(() => () => void save(changes, nextStep));
     } finally {
       setBusy(false);
@@ -208,11 +242,7 @@ export function Onboarding() {
       });
       navigate("/");
     } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "We could not skip onboarding",
-      );
+      setError(caught instanceof Error ? caught.message : strings.skipError);
       setRetry(() => () => void skip());
     } finally {
       setBusy(false);
@@ -230,11 +260,7 @@ export function Onboarding() {
       });
       navigate("/");
     } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "We could not finish onboarding",
-      );
+      setError(caught instanceof Error ? caught.message : strings.finishError);
       setRetry(() => () => void complete());
     } finally {
       setBusy(false);
@@ -246,7 +272,7 @@ export function Onboarding() {
   if (!profile)
     return (
       <Spinner
-        label={slow ? "Waking the server…" : "Loading your journey"}
+        label={slow ? strings.wakingServer : strings.loadingJourney}
         fullScreen
       />
     );
@@ -254,7 +280,7 @@ export function Onboarding() {
   const optionScreen =
     step === 3 ? (
       <OptionList
-        choices={ageChoices}
+        choices={localize(ageChoices)}
         selected={preferences?.age_band}
         disabled={busy}
         onSelect={(value) => {
@@ -263,9 +289,7 @@ export function Onboarding() {
             preferences?.connection,
           ).some(({ value: goal }) => goal === preferences?.goal);
           if (preferences?.goal && !goalIsValid) {
-            setRevisitMessage(
-              "Your earlier goal no longer fits this answer. Please choose it again.",
-            );
+            setRevisitMessage(strings.goalChanged);
             void save({ age_band: value, goal: null }, 5);
           } else {
             void save({ age_band: value }, 4);
@@ -274,18 +298,15 @@ export function Onboarding() {
       />
     ) : step === 4 ? (
       <OptionList
-        choices={connectionChoicesFor(preferences?.age_band)}
+        choices={localize(connectionChoicesFor(preferences?.age_band))}
         selected={preferences?.connection}
         disabled={busy}
         onSelect={(value) => {
-          const goalIsValid = goalChoicesFor(
-            preferences?.age_band,
-            value,
-          ).some(({ value: goal }) => goal === preferences?.goal);
+          const goalIsValid = goalChoicesFor(preferences?.age_band, value).some(
+            ({ value: goal }) => goal === preferences?.goal,
+          );
           if (preferences?.goal && !goalIsValid) {
-            setRevisitMessage(
-              "Your earlier goal no longer fits this answer. Please choose it again.",
-            );
+            setRevisitMessage(strings.goalChanged);
             void save({ connection: value, goal: null }, 5);
           } else {
             void save({ connection: value }, 5);
@@ -294,9 +315,8 @@ export function Onboarding() {
       />
     ) : step === 5 ? (
       <OptionList
-        choices={goalChoicesFor(
-          preferences?.age_band,
-          preferences?.connection,
+        choices={localize(
+          goalChoicesFor(preferences?.age_band, preferences?.connection),
         )}
         selected={preferences?.goal}
         disabled={busy}
@@ -304,14 +324,14 @@ export function Onboarding() {
       />
     ) : step === 6 ? (
       <OptionList
-        choices={styleChoices}
+        choices={localize(styleChoices)}
         selected={preferences?.style}
         disabled={busy}
         onSelect={(value) => void save({ style: value }, 7)}
       />
     ) : step === 7 ? (
       <OptionList
-        choices={dailyChoices}
+        choices={localize(dailyChoices)}
         selected={preferences?.daily_minutes as 5 | 15 | 30 | null}
         disabled={busy}
         onSelect={(value) => void save({ daily_minutes: value }, 8)}
@@ -329,7 +349,7 @@ export function Onboarding() {
               className="min-h-11 px-2 font-semibold text-indigo-deep"
               onClick={() => navigate(`/onboarding/${step - 1}`)}
             >
-              ← Back
+              {strings.back}
             </button>
           ) : (
             <span />
@@ -339,11 +359,11 @@ export function Onboarding() {
             disabled={busy}
             onClick={() => void skip()}
           >
-            Skip for now
+            {strings.skipForNow}
           </button>
         </div>
         <div
-          aria-label={`Step ${step} of 10`}
+          aria-label={`${strings.step} ${step} ${strings.ofTen}`}
           className="mb-8 h-2 overflow-hidden rounded-full bg-sand"
         >
           <div
@@ -356,20 +376,18 @@ export function Onboarding() {
           className="onboarding-screen rounded-[2rem] bg-cream p-6 shadow-card motion-reduce:animate-none"
         >
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-terracotta">
-            Setting up · Step {step} of 10
+            {strings.settingUp} · {strings.step} {step} {strings.ofTen}
           </p>
           <h1 className="mt-2 font-display text-3xl font-semibold text-indigo-deep">
             {headings[step - 1]}
           </h1>
           {step === 1 && (
-            <p className="mt-4 leading-7 text-muted">
-              Welcome. Let&apos;s personalise your journey.
-            </p>
+            <p className="mt-4 leading-7 text-muted">{strings.welcome}</p>
           )}
           <div className="mt-6">
             {step === 1 && (
               <Button busy={busy} onClick={() => void save({}, 2)}>
-                Get started
+                {strings.getStarted}
               </Button>
             )}
             {step === 2 &&
@@ -391,7 +409,7 @@ export function Onboarding() {
                 />
               ) : !error ? (
                 <Spinner
-                  label={slow ? "Waking the server…" : "Loading languages"}
+                  label={slow ? strings.wakingServer : strings.loadingLanguages}
                 />
               ) : null)}
             {optionScreen}
@@ -403,9 +421,9 @@ export function Onboarding() {
             {step === 8 && (
               <div className="space-y-4">
                 <label className="grid gap-2 font-semibold text-indigo-deep">
-                  Reminder time
+                  {strings.reminderTime}
                   <input
-                    aria-label="Reminder time"
+                    aria-label={strings.reminderTime}
                     type="time"
                     value={time}
                     onChange={(event) => setTime(event.target.value)}
@@ -425,7 +443,7 @@ export function Onboarding() {
                     )
                   }
                 >
-                  Set reminder
+                  {strings.setReminder}
                 </Button>
                 <Button
                   variant="secondary"
@@ -441,7 +459,7 @@ export function Onboarding() {
                     )
                   }
                 >
-                  No reminders
+                  {strings.noReminders}
                 </Button>
               </div>
             )}
@@ -450,7 +468,7 @@ export function Onboarding() {
                 {question ? (
                   <>
                     <p className="text-sm font-semibold text-muted">
-                      Question {questionIndex + 1} of 3
+                      {strings.question} {questionIndex + 1} {strings.ofThree}
                     </p>
                     <p className="font-display text-2xl font-semibold text-indigo-deep">
                       {question.item.target_text}
@@ -463,7 +481,7 @@ export function Onboarding() {
                           isCorrect: value === question.item.translation,
                         })),
                         {
-                          label: "I'm not sure",
+                          label: strings.notSure,
                           isCorrect: false,
                           isNeutral: true,
                         },
@@ -490,7 +508,7 @@ export function Onboarding() {
                 ) : !error ? (
                   <Spinner
                     label={
-                      slow ? "Waking the server…" : "Preparing your questions"
+                      slow ? strings.wakingServer : strings.preparingQuestions
                     }
                   />
                 ) : null}
@@ -499,7 +517,7 @@ export function Onboarding() {
                   disabled={busy}
                   onClick={() => void save({}, 10)}
                 >
-                  Skip this
+                  {strings.skipThis}
                 </button>
               </div>
             )}
@@ -518,7 +536,7 @@ export function Onboarding() {
               role="status"
               className="mt-4 text-center text-sm font-semibold text-muted"
             >
-              Waking the server…
+              {strings.wakingServer}
             </p>
           )}
           {error && (
@@ -526,7 +544,7 @@ export function Onboarding() {
               <ErrorMessage message={error} />
               {retry && (
                 <Button variant="secondary" onClick={retry}>
-                  Retry
+                  {strings.retry}
                 </Button>
               )}
             </div>
@@ -556,22 +574,23 @@ function LanguagePair({
   busy: boolean;
   onConfirm: (active: string, meta: string) => void;
 }) {
+  const strings = useUiStrings().onboarding;
   const [active, setActive] = useState(activeLanguage);
   const [meta, setMeta] = useState(metaLanguage);
   const selectedMeta = catalogue.meta.find(({ code }) => code === meta);
   return (
     <div className="space-y-6">
       <LanguageSelect
-        title="What do you want to learn?"
+        title={strings.learnWhat}
         languages={catalogue.learnable}
         selected={active}
-        placeholder="Choose a language"
+        placeholder={strings.chooseLanguage}
         onSelect={setActive}
       />
       {active && (
         <div className="onboarding-screen motion-reduce:animate-none">
           <LanguageSelect
-            title="What language do you want to learn with?"
+            title={strings.learnWith}
             languages={catalogue.meta}
             selected={meta}
             showCoverage
@@ -579,12 +598,10 @@ function LanguagePair({
           />
         </div>
       )}
-      {selectedMeta &&
-        active &&
-        hasIncompleteCoverage(selectedMeta) && (
+      {selectedMeta && active && hasIncompleteCoverage(selectedMeta) && (
         <p className="rounded-xl bg-ochre-soft p-3 text-sm text-indigo-deep">
-          {selectedMeta.name} translations are still being written — you&apos;ll
-          see English where {selectedMeta.name} isn&apos;t ready yet.
+          {selectedMeta.name} {strings.translationsPending} {selectedMeta.name}{" "}
+          {strings.notReady}
         </p>
       )}
       <Button
@@ -592,7 +609,7 @@ function LanguagePair({
         disabled={!active || !meta}
         onClick={() => onConfirm(active, meta)}
       >
-        Continue
+        {strings.continue}
       </Button>
     </div>
   );
@@ -613,6 +630,7 @@ function LanguageSelect({
   showCoverage?: boolean;
   onSelect: (code: string) => void;
 }) {
+  const strings = useUiStrings().onboarding;
   return (
     <label className="grid gap-2 font-semibold text-indigo-deep">
       {title}
@@ -627,7 +645,9 @@ function LanguageSelect({
           </option>
         )}
         {languages.map((language) => {
-          const coverage = showCoverage ? coverageLabel(language) : null;
+          const coverage = showCoverage
+            ? coverageLabel(language, strings.translated)
+            : null;
           return (
             <option
               key={language.code}
@@ -635,7 +655,7 @@ function LanguageSelect({
               disabled={!language.available}
             >
               {languageLabel(language)}
-              {!language.available ? " — Coming soon" : ""}
+              {!language.available ? ` — ${strings.comingSoon}` : ""}
               {coverage ? ` — ${coverage}` : ""}
             </option>
           );
@@ -658,6 +678,25 @@ function CompletionSummary({
   onComplete: () => void;
   onChange: () => void;
 }) {
+  const ui = useUiStrings();
+  const strings = ui.onboarding;
+  const summaryChoiceLabels: Record<string, string> = {
+    complete_beginner: ui.choices.completeBeginner,
+    language_enthusiast: ui.choices.languageEnthusiast,
+    connected_to_igbo_family: ui.choices.connectedFamily,
+    igbo_heritage_speaker: ui.choices.heritageSpeaker,
+    igbo_parent_abroad: ui.choices.parentAbroad,
+    mixed_parent_abroad: ui.choices.mixedParent,
+    aboriginal_native: ui.choices.nativeSpeaker,
+    other_african_heritage: ui.choices.otherAfricanHeritage,
+    family_and_culture: ui.choices.familyCulture,
+    teach_my_children: ui.choices.teachChildren,
+    visiting_nigeria: ui.choices.visitingNigeria,
+    academic_professional: ui.choices.academic,
+    cultural_pride: ui.choices.culturalPride,
+    new_language: ui.choices.newLanguage,
+    improve_proverbs_vocab: ui.choices.improveProverbs,
+  };
   const { preferences } = profile;
   const learnable = catalogue?.learnable.find(
     ({ code }) => code === preferences.active_language,
@@ -665,11 +704,34 @@ function CompletionSummary({
   const meta = catalogue?.meta.find(
     ({ code }) => code === preferences.meta_language,
   );
+  const connection = connectionChoicesFor(preferences.age_band).find(
+    ({ value }) => value === preferences.connection,
+  );
+  const goal = goalChoicesFor(
+    preferences.age_band,
+    preferences.connection,
+  ).find(({ value }) => value === preferences.goal);
   const summary = [
-    ["Language pair", `${learnable?.name ?? preferences.active_language} with ${meta?.name ?? preferences.meta_language ?? "English"}`],
-    ["Connection", connectionChoicesFor(preferences.age_band).find(({ value }) => value === preferences.connection)?.label ?? "Not set"],
-    ["Goal", goalChoicesFor(preferences.age_band, preferences.connection).find(({ value }) => value === preferences.goal)?.label ?? "Not set"],
-    ["Daily time", preferences.daily_minutes ? `${preferences.daily_minutes} minutes` : "Not set"],
+    [
+      strings.languagePair,
+      `${learnable?.name ?? preferences.active_language} ${strings.with} ${meta?.name ?? preferences.meta_language ?? strings.english}`,
+    ],
+    [
+      strings.connection,
+      summaryChoiceLabels[String(connection?.value)] ??
+        connection?.label ??
+        strings.notSet,
+    ],
+    [
+      strings.goal,
+      summaryChoiceLabels[String(goal?.value)] ?? goal?.label ?? strings.notSet,
+    ],
+    [
+      strings.dailyTime,
+      preferences.daily_minutes
+        ? `${preferences.daily_minutes} ${strings.minutes}`
+        : strings.notSet,
+    ],
   ];
   return (
     <div className="space-y-5">
@@ -681,8 +743,12 @@ function CompletionSummary({
           </div>
         ))}
       </dl>
-      <Button busy={busy} onClick={onComplete}>Bịa — Start learning</Button>
-      <Button variant="secondary" disabled={busy} onClick={onChange}>Change something</Button>
+      <Button busy={busy} onClick={onComplete}>
+        {strings.startLearning}
+      </Button>
+      <Button variant="secondary" disabled={busy} onClick={onChange}>
+        {strings.changeSomething}
+      </Button>
     </div>
   );
 }

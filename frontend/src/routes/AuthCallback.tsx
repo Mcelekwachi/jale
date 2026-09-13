@@ -2,9 +2,11 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { Spinner } from "../components/Spinner";
+import { useUiStrings } from "../i18n/useUiStrings";
 import { supabase } from "../lib/supabase";
 
 export function AuthCallback() {
+  const strings = useUiStrings().shared;
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -23,12 +25,12 @@ export function AuthCallback() {
             message:
               error instanceof Error
                 ? error.message
-                : "We could not complete sign-in",
+                : strings.completeSignInError,
           },
         });
       }
     })();
-  }, [navigate]);
+  }, [navigate, strings.completeSignInError]);
 
-  return <Spinner label="Completing sign-in" fullScreen />;
+  return <Spinner label={strings.completingSignIn} fullScreen />;
 }
