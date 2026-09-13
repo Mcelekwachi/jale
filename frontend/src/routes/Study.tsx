@@ -17,6 +17,7 @@ import type { AnswerResponse } from "../study/answerQueue";
 import { answerQueue } from "../study/answerQueueService";
 import { AudioButton } from "../study/AudioButton";
 import { FlagSheet } from "../study/FlagSheet";
+import { setUiLanguage, useUiStrings } from "../i18n/useUiStrings";
 
 const META_LANGUAGE_KEY = "jale:meta-language";
 
@@ -26,6 +27,7 @@ async function loadMetaLanguage(): Promise<string> {
       authenticated: true,
     });
     const code = profile.preferences.meta_language ?? defaultMetaLanguage();
+    setUiLanguage(code);
     localStorage.setItem(META_LANGUAGE_KEY, code);
     return code;
   } catch (error) {
@@ -36,6 +38,7 @@ async function loadMetaLanguage(): Promise<string> {
 }
 
 export function Study() {
+  const strings = useUiStrings().study;
   const { trackSlug = "", unitPosition = "" } = useParams();
   const [session, setSession] = useState<StudySession | null>(null);
   const [meta, setMeta] = useState<string>(defaultMetaLanguage());
@@ -69,7 +72,7 @@ export function Study() {
           `/v1/tracks/${trackSlug}/units/${unitPosition}/items?${params}`,
           { authenticated: true, onSlowChange: (v) => active && setSlow(v) },
         );
-        if (!next) throw new Error("Study unit was not available");
+        if (!next) throw new Error(strings.unavailable);
         if (active) {
           setMeta(code);
           setMetaName(languages.find((l) => l.code === code)?.name ?? code);
@@ -83,8 +86,8 @@ export function Study() {
             e instanceof Error
               ? navigator.onLine
                 ? e.message
-                : "You'll need a connection for this unit."
-              : "Could not load this study session",
+                : strings.offlineUnit
+              : strings.loadError,
           );
       }
     };
@@ -92,7 +95,14 @@ export function Study() {
     return () => {
       active = false;
     };
-  }, [direction, trackSlug, unitPosition]);
+  }, [
+    direction,
+    strings.loadError,
+    strings.offlineUnit,
+    strings.unavailable,
+    trackSlug,
+    unitPosition,
+  ]);
   const record = async (isCorrect: boolean) => {
     if (!session) return;
     setCorrect((value) => value + Number(isCorrect));
@@ -145,7 +155,7 @@ export function Study() {
   if (!session)
     return (
       <Spinner
-        label={slow ? "Waking the server…" : "Loading your study session"}
+        label={slow ? strings.wakingServer : strings.loading}
         fullScreen
       />
     );
@@ -154,19 +164,21 @@ export function Study() {
       <main className="min-h-dvh bg-warm p-5">
         <section className="mx-auto max-w-md rounded-[2rem] bg-cream p-7 shadow-card">
           <h1 className="font-display text-4xl text-indigo-deep">
-            Session complete
+            {strings.complete}
           </h1>
           <p className="mt-4">
-            {session.items.length} items reviewed · {correct} correct
+            {session.items.length} {strings.reviewed} · {correct}{" "}
+            {strings.correct}
           </p>
           {summary && (
             <p className="mt-2">
-              {summary.current_streak} day streak · {summary.today_xp} XP today
+              {summary.current_streak} {strings.dayStreak} · {summary.today_xp}{" "}
+              {strings.xpToday}
             </p>
           )}
           {retry && (
             <>
-              <ErrorMessage message="Your answers are still safe in this session." />
+              <ErrorMessage message={strings.answersSafe} />
               <button
                 className="mt-4 min-h-11 rounded-xl bg-indigo-deep px-5 text-cream"
                 onClick={() =>
@@ -179,7 +191,7 @@ export function Study() {
                     .catch(() => setRetry(true))
                 }
               >
-                Retry submission
+                {strings.retry}
               </button>
             </>
           )}
@@ -195,13 +207,13 @@ export function Study() {
                 setShownAt(Date.now());
               }}
             >
-              Repeat unit
+              {strings.repeat}
             </button>
             <Link
               className="inline-flex min-h-11 items-center rounded-xl bg-indigo-deep px-4 text-cream"
               to="/"
             >
-              Return home
+              {strings.returnHome}
             </Link>
           </div>
         </section>
@@ -213,16 +225,18 @@ export function Study() {
       <div className="mx-auto max-w-lg">
         <header className="flex items-center justify-between">
           <Link to="/" className="inline-flex min-h-11 items-center">
-            ← Home
+            {strings.home}
           </Link>
-          <span>Item {index + 1} of {session.items.length}</span>
+          <span>
+            {strings.item} {index + 1} {strings.of} {session.items.length}
+          </span>
         </header>
         <p className="text-xs font-bold uppercase tracking-[.18em] text-terracotta">
           {trackName} · {session.unit_title}
         </p>
         {queueError && (
           <div className="my-3 rounded-xl bg-terracotta-soft p-3 text-sm">
-            Answers are still safe in this session.{" "}
+            {strings.answersSafeShort}{" "}
             <button
               className="min-h-11 font-bold underline"
               onClick={() =>
@@ -232,7 +246,7 @@ export function Study() {
                   .catch(() => setQueueError(true))
               }
             >
-              Retry submission
+              {strings.retry}
             </button>
           </div>
         )}
@@ -303,6 +317,7 @@ function Reveal({
   onRate: (correct: boolean) => void;
   disabled: boolean;
 }) {
+  const strings = useUiStrings().study;
   if (!revealed)
     return (
       <button
@@ -310,7 +325,7 @@ function Reveal({
         onClick={onReveal}
         className="mt-8 min-h-12 w-full rounded-xl bg-indigo-deep font-bold text-cream"
       >
-        Reveal translation
+        {strings.reveal}
       </button>
     );
   return (
@@ -343,14 +358,14 @@ function Reveal({
           onClick={() => onRate(false)}
           className="min-h-12 rounded-xl border border-terracotta font-bold"
         >
-          Still learning
+          {strings.stillLearning}
         </button>
         <button
           disabled={disabled}
           onClick={() => onRate(true)}
           className="min-h-12 rounded-xl bg-indigo-deep font-bold text-cream"
         >
-          I knew it
+          {strings.knewIt}
         </button>
       </div>
     </div>
