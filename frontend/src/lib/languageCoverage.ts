@@ -9,11 +9,14 @@ export function hasIncompleteCoverage(language: {
   );
 }
 
-export function coverageLabel(language: {
-  translated_count?: number;
-  total_count?: number;
-}) {
+export function coverageLabel(
+  language: {
+    translated_count?: number;
+    total_count?: number;
+  },
+  translated = "translated",
+) {
   return hasIncompleteCoverage(language)
-    ? `${language.translated_count}/${language.total_count} translated`
+    ? `${language.translated_count}/${language.total_count} ${translated}`
     : null;
 }

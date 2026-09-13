@@ -293,7 +293,16 @@ export function Study() {
             />
           )}
           <div className="mt-7 flex flex-wrap justify-between gap-3">
-            <AudioButton url={item.audio_url} state={item.audio_state} />
+            <AudioButton
+              url={item.audio_url}
+              state={item.audio_state}
+              labels={{
+                comingSoon: strings.audioComingSoon,
+                play: strings.playAudio,
+                sample: strings.sample,
+                error: strings.audioError,
+              }}
+            />
             <FlagSheet key={item.id} contentId={item.id} metaLanguage={meta} />
           </div>
         </article>

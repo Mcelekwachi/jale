@@ -230,7 +230,10 @@ export function Settings() {
         <SettingSection title={strings.explanationLanguage}>
           <OptionList
             choices={languages.map((language) => ({
-              label: [language.name, coverageLabel(language)]
+              label: [
+                language.name,
+                coverageLabel(language, strings.translated),
+              ]
                 .filter(Boolean)
                 .join(" — "),
               value: language.code,

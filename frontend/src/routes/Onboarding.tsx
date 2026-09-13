@@ -635,7 +635,9 @@ function LanguageSelect({
           </option>
         )}
         {languages.map((language) => {
-          const coverage = showCoverage ? coverageLabel(language) : null;
+          const coverage = showCoverage
+            ? coverageLabel(language, strings.translated)
+            : null;
           return (
             <option
               key={language.code}

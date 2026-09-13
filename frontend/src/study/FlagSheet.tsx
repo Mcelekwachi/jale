@@ -1,15 +1,14 @@
 import { useState } from "react";
 import { apiFetch } from "../lib/api";
+import { useUiStrings } from "../i18n/useUiStrings";
 
-const reasons = {
-  bad_audio: "The audio is wrong or unclear",
-  wrong_translation: "The translation is wrong",
-  cultural_inaccuracy: "The cultural note is inaccurate",
-  spelling_or_tone: "The spelling or tone marks are wrong",
-  offensive: "This is offensive",
-  other: "Something else",
-} as const;
-type Reason = keyof typeof reasons;
+type Reason =
+  | "bad_audio"
+  | "wrong_translation"
+  | "cultural_inaccuracy"
+  | "spelling_or_tone"
+  | "offensive"
+  | "other";
 export function FlagSheet({
   contentId,
   metaLanguage,
@@ -17,6 +16,15 @@ export function FlagSheet({
   contentId: number;
   metaLanguage: string;
 }) {
+  const strings = useUiStrings().study;
+  const reasons: Record<Reason, string> = {
+    bad_audio: strings.badAudio,
+    wrong_translation: strings.wrongTranslation,
+    cultural_inaccuracy: strings.culturalInaccuracy,
+    spelling_or_tone: strings.spellingOrTone,
+    offensive: strings.offensive,
+    other: strings.other,
+  };
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState<Reason | null>(null);
   const [note, setNote] = useState("");
@@ -36,13 +44,11 @@ export function FlagSheet({
             : {}),
         }),
       });
-      setMessage(
-        reported ? "Thanks, already reported" : "Thanks for helping us improve",
-      );
+      setMessage(reported ? strings.alreadyReported : strings.reportThanks);
       setReported(true);
       setOpen(false);
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Could not send report");
+      setMessage(e instanceof Error ? e.message : strings.reportError);
     }
   };
   return (
@@ -52,7 +58,7 @@ export function FlagSheet({
         onClick={() => setOpen(true)}
         className="min-h-11 rounded-xl border border-sand px-4 font-semibold"
       >
-        ⚑ Flag
+        {strings.flag}
       </button>
       {message && (
         <p role="status" className="mt-2 text-sm">
@@ -62,11 +68,11 @@ export function FlagSheet({
       {open && (
         <div
           role="dialog"
-          aria-label="Report this item"
+          aria-label={strings.reportItem}
           className="fixed inset-x-0 bottom-0 z-10 mx-auto max-w-lg rounded-t-[2rem] bg-cream p-6 shadow-card"
         >
           <h2 className="font-display text-2xl text-indigo-deep">
-            What needs attention?
+            {strings.attention}
           </h2>
           <fieldset className="mt-4 space-y-2">
             {Object.entries(reasons).map(([value, label]) => (
@@ -82,7 +88,7 @@ export function FlagSheet({
             ))}
           </fieldset>
           <label className="mt-3 grid gap-2">
-            Optional note
+            {strings.optionalNote}
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
@@ -96,14 +102,14 @@ export function FlagSheet({
               disabled={!reason}
               className="min-h-11 flex-1 rounded-xl bg-indigo-deep px-4 font-bold text-cream"
             >
-              Send report
+              {strings.sendReport}
             </button>
             <button
               type="button"
               onClick={() => setOpen(false)}
               className="min-h-11 px-4"
             >
-              Cancel
+              {strings.cancel}
             </button>
           </div>
         </div>
