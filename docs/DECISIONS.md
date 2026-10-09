@@ -7,7 +7,7 @@ Status: `open` until answered. Nothing here has been implemented.
 
 | # | Severity | Finding | Proposed action | Tier |
 |---|----------|---------|-----------------|------|
-| F1 | High | Seed runs on every boot (`RUN_SEED=true`) and overwrites `target_text` and `example_sentence` on `ON CONFLICT (source_key)`. Admin corrections to Igbo text are reverted on the next deploy. | Seed inserts only; never updates text on existing rows (or turn `RUN_SEED` off in prod). | B (touches real content) |
+| F1 | High (fixed in this PR) | Seed runs on every boot (`RUN_SEED=true`) and overwrites `target_text` and `example_sentence` on `ON CONFLICT (source_key)`. Admin corrections to Igbo text are reverted on the next deploy. | Seed inserts only; never updates text on existing rows (or turn `RUN_SEED` off in prod). | B (touches real content) |
 | F2 | High | `admin_flag_queue` view is SECURITY DEFINER (Supabase ERROR lint). | Recreate with `security_invoker = true`; verify backend role still reads it. | B (schema) |
 | F3 | Medium | `rls_auto_enable()` is SECURITY DEFINER and executable by `anon`/`authenticated` via REST. | `REVOKE EXECUTE` from `anon, authenticated, public`. | B (schema) |
 | F4 | Medium | Admin promotion trusts the `email` JWT claim; `email_verified` is not checked. Safe only while Supabase "Confirm email" stays on. | Require `email_verified` in `provision_user`. | B (auth) |
@@ -22,13 +22,13 @@ Status: `open` until answered. Nothing here has been implemented.
 
 Not verified: Supabase "Confirm email" setting, custom SMTP (a 429 magic-link rate limit was seen earlier), Render env values (CORS_ORIGINS).
 
-## D1. Children's privacy and consent (open)
+## D1. Children's privacy and consent (consent age decided: 16)
 Live DB currently has 0 child accounts, so this is best built before launch. Proposed build:
 1. Age gate at onboarding; under the consent age, require parental consent (email-based) before account activation.
 2. Account deletion + data export endpoints and Settings UI (FKs already cascade from `app_users`).
 3. Public profile off by default; child accounts never public.
 4. Privacy policy page; no analytics/Sentry PII for child accounts.
-Needs from Michael: the consent age to apply (NL digital consent age is 16 per my understanding; to be confirmed with legal advice), and whether the first release excludes under-consent-age users instead.
+Decided 2026-10-09: consent age is 16 (Michael). Still open: whether the first release excludes under-16s instead of building the parental-consent flow, and legal confirmation of the Dutch rule.
 
 ## D2. Free-tier hosting (open)
 - Supabase free pauses after ~7 days idle. Options: keep-alive ping (free, fragile) vs Pro (paid).
@@ -40,3 +40,6 @@ Create DSNs (frontend + backend) and add as env vars on Vercel/Render. Claude th
 
 ## D4. Carried over (open)
 Alphabet rename to "Mkpụrụedemede — Alphabet"; tone marking (blocks the elephant word); 5 missing alphabet example words (f, l, sh, v, y); 50 blank Dutch proverbs.
+
+## Resolved
+- F1 seed overwrite (2026-10-09, approved by Michael): the seed no longer overwrites text on rows that are verified or were edited by an admin. Provenance: `verified_by` records who approved; `content_revisions.changed_by` records who entered an edit; every text change the seed itself makes is logged as a revision with no author (note starts with "seed:"), and skipped differences are printed as `KEPT` in the deploy log.
