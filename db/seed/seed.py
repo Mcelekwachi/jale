@@ -26,6 +26,7 @@ from pathlib import Path
 import psycopg
 import yaml
 from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONTENT_ROOT = REPO_ROOT / "content"
@@ -195,7 +196,12 @@ def upsert_content(cur, language_id, dialect_id, cat_ids, rows, position_start=0
     for offset, r in enumerate(rows):
         cur.execute(
             """
-            SELECT c.language_id, l.code AS language_code, c.content_type
+            SELECT c.id, c.language_id, l.code AS language_code, c.content_type,
+                   c.target_text, c.example_sentence, c.example_translation,
+                   (c.verified OR EXISTS (
+                       SELECT 1 FROM content_revisions r
+                        WHERE r.content_id = c.id AND r.changed_by IS NOT NULL
+                   )) AS curated
               FROM content_items c
               JOIN languages l ON l.id = c.language_id
              WHERE c.source_key = %s
@@ -230,11 +236,29 @@ def upsert_content(cur, language_id, dialect_id, cat_ids, rows, position_start=0
             ON CONFLICT (source_key) DO UPDATE SET
                 category_id         = EXCLUDED.category_id,
                 difficulty_level    = EXCLUDED.difficulty_level,
-                target_text         = EXCLUDED.target_text,
-                example_sentence    = EXCLUDED.example_sentence,
-                example_translation = COALESCE(EXCLUDED.example_translation,
-                                               content_items.example_translation),
                 sort_order          = EXCLUDED.sort_order,
+                -- Words are curated content. Once a person has verified a row or
+                -- edited it through the admin API, the CSV must never overwrite
+                -- it. Uncurated rows still follow the file.
+                target_text         = CASE WHEN (content_items.verified OR EXISTS (
+                      SELECT 1 FROM content_revisions r
+                       WHERE r.content_id = content_items.id
+                         AND r.changed_by IS NOT NULL))
+                                           THEN content_items.target_text
+                                           ELSE EXCLUDED.target_text END,
+                example_sentence    = CASE WHEN (content_items.verified OR EXISTS (
+                      SELECT 1 FROM content_revisions r
+                       WHERE r.content_id = content_items.id
+                         AND r.changed_by IS NOT NULL))
+                                           THEN content_items.example_sentence
+                                           ELSE EXCLUDED.example_sentence END,
+                example_translation = CASE WHEN (content_items.verified OR EXISTS (
+                      SELECT 1 FROM content_revisions r
+                       WHERE r.content_id = content_items.id
+                         AND r.changed_by IS NOT NULL))
+                                           THEN content_items.example_translation
+                                           ELSE COALESCE(EXCLUDED.example_translation,
+                                                         content_items.example_translation) END,
                 -- tone marking and audio are contributor-owned once set:
                 -- the seed only fills them, never blanks them.
                 target_text_toned = COALESCE(EXCLUDED.target_text_toned,
@@ -273,7 +297,52 @@ def upsert_content(cur, language_id, dialect_id, cat_ids, rows, position_start=0
             inserted += 1
         else:
             updated += 1
+            record_seed_change(cur, owner, r)
     return inserted, updated
+
+
+TEXT_FIELDS = ("target_text", "example_sentence", "example_translation")
+
+
+def record_seed_change(cur, owner, incoming):
+    """Keep an audit trail when the seed changes (or declines to change) text.
+
+    Uncurated rows follow the CSV, so a differing value is applied and logged as
+    a revision with no author (changed_by NULL = the seed, not a person).
+    Curated rows (verified, or edited by an admin) are never overwritten; the
+    skipped difference is printed so a human can decide which version wins.
+    """
+    if owner is None:
+        return
+    wanted = {
+        "target_text": incoming["target_text"].strip(),
+        "example_sentence": nullify(incoming.get("example_sentence")),
+        "example_translation": nullify(incoming.get("example_translation"))
+        or owner["example_translation"],
+    }
+    before = {f: owner[f] for f in TEXT_FIELDS}
+    diff = {f: v for f, v in wanted.items() if v != before[f]}
+    if not diff:
+        return
+    if owner["curated"]:
+        print(
+            f"  KEPT  {incoming['source_key']}: curated text differs from the file "
+            f"({', '.join(sorted(diff))}); file value ignored"
+        )
+        return
+    after = {**before, **diff}
+    cur.execute(
+        """
+        INSERT INTO content_revisions (content_id, changed_by, change_note, before_state, after_state)
+        VALUES (%s, NULL, %s, %s, %s)
+        """,
+        (
+            owner["id"],
+            "seed: text updated from content file",
+            Jsonb(before),
+            Jsonb(after),
+        ),
+    )
 
 
 def upsert_translations(cur, content_ids, language_ids, translations):
@@ -286,12 +355,29 @@ def upsert_translations(cur, content_ids, language_ids, translations):
                 literal_translation, cultural_note
             ) VALUES (%s, %s, %s, %s, %s)
             ON CONFLICT (content_id, meta_language_id) DO UPDATE SET
-                translation = COALESCE(NULLIF(EXCLUDED.translation, ''),
-                                       content_translations.translation),
-                literal_translation = COALESCE(EXCLUDED.literal_translation,
-                                               content_translations.literal_translation),
-                cultural_note = COALESCE(EXCLUDED.cultural_note,
-                                         content_translations.cultural_note)
+                -- Curated translations (verified, or edited by an admin) are
+                -- never overwritten by the file.
+                translation = CASE WHEN (content_translations.verified OR EXISTS (
+                      SELECT 1 FROM content_revisions r
+                       WHERE r.content_id = content_translations.content_id
+                         AND r.changed_by IS NOT NULL))
+                                   THEN content_translations.translation
+                                   ELSE COALESCE(NULLIF(EXCLUDED.translation, ''),
+                                                 content_translations.translation) END,
+                literal_translation = CASE WHEN (content_translations.verified OR EXISTS (
+                      SELECT 1 FROM content_revisions r
+                       WHERE r.content_id = content_translations.content_id
+                         AND r.changed_by IS NOT NULL))
+                                   THEN content_translations.literal_translation
+                                   ELSE COALESCE(EXCLUDED.literal_translation,
+                                                 content_translations.literal_translation) END,
+                cultural_note = CASE WHEN (content_translations.verified OR EXISTS (
+                      SELECT 1 FROM content_revisions r
+                       WHERE r.content_id = content_translations.content_id
+                         AND r.changed_by IS NOT NULL))
+                                   THEN content_translations.cultural_note
+                                   ELSE COALESCE(EXCLUDED.cultural_note,
+                                                 content_translations.cultural_note) END
             RETURNING (xmax = 0) AS was_insert
             """,
             (

@@ -39,9 +39,7 @@ def test_upsert_content_populates_example_translation_without_blanking_existing_
 
     insert_query, insert_params = cursor.calls[1]
     assert "example_translation" in insert_query
-    assert "example_translation = COALESCE(EXCLUDED.example_translation," in " ".join(
-        insert_query.split()
-    )
+    assert "ELSE COALESCE(EXCLUDED.example_translation," in " ".join(insert_query.split())
     assert insert_params["example_translation"] == "hand"
 
 
@@ -60,8 +58,7 @@ def test_unknown_translation_source_key_fails_preflight(tmp_path, monkeypatch):
     )
     (language_dir / "tracks.yaml").write_text("tracks: []\n", encoding="utf-8")
     (translations / "nl.csv").write_text(
-        "source_key,translation,literal_translation,cultural_note\n"
-        "ibo:word:missing,Ontbrekend,,\n",
+        "source_key,translation,literal_translation,cultural_note\nibo:word:missing,Ontbrekend,,\n",
         encoding="utf-8",
     )
     monkeypatch.setattr(seed, "CONTENT_ROOT", tmp_path)
