@@ -234,6 +234,16 @@ async def set_pin(user_id: Any, pin: str) -> None:
         )
 
 
+async def has_pin(user_id: Any) -> bool:
+    async with get_pool().connection() as conn:
+        cursor = await conn.execute(
+            "SELECT parent_pin_hash IS NOT NULL AS has_pin FROM app_users WHERE id = %(id)s",
+            {"id": user_id},
+        )
+        row = await cursor.fetchone()
+    return bool(row and row["has_pin"])
+
+
 async def verify_pin(user_id: Any, pin: str) -> bool:
     async with get_pool().connection() as conn:
         cursor = await conn.execute(

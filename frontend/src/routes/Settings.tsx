@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useAuth } from "../auth/useAuth";
+import { BackToParent } from "../family/BackToParent";
+import { FamilySection } from "../family/FamilySection";
+import { useActiveProfileId } from "../lib/activeProfile";
 import { Button } from "../components/Button";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { Spinner } from "../components/Spinner";
@@ -24,7 +27,22 @@ import {
   styleChoices,
 } from "../onboarding/options";
 
+/** Settings belong to the parent: a child profile only sees how to hand back. */
 export function Settings() {
+  const strings = useUiStrings();
+  return useActiveProfileId() ? (
+    <main className="min-h-dvh bg-warm px-5 py-7 text-ink">
+      <div className="mx-auto max-w-2xl space-y-5">
+        <p>{strings.family.parentsOnly}</p>
+        <BackToParent />
+      </div>
+    </main>
+  ) : (
+    <ParentSettings />
+  );
+}
+
+function ParentSettings() {
   const ui = useUiStrings();
   const strings = ui.settings;
   const choiceLabels: Record<string, string> = {
@@ -296,6 +314,7 @@ export function Settings() {
             </Button>
           </div>
         </SettingSection>
+        <FamilySection onAccountDeleted={() => void signOut()} />
       </div>
     </main>
   );

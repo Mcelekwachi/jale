@@ -10,6 +10,7 @@ import { setUiLanguage } from "../i18n/useUiStrings";
 
 vi.mock("../auth/useAuth", () => ({ useAuth: () => ({ signOut: vi.fn() }) }));
 vi.mock("../lib/api");
+vi.mock("../family/ProfileBar", () => ({ ProfileBar: () => null }));
 
 const track = {
   track: {

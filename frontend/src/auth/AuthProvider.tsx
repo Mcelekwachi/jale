@@ -1,6 +1,7 @@
 import type { Session } from "@supabase/supabase-js";
 import { useEffect, useMemo, useState, type PropsWithChildren } from "react";
 
+import { setActiveProfileId } from "../lib/activeProfile";
 import { supabase } from "../lib/supabase";
 import { AuthContext, type AuthContextValue } from "./auth-context";
 
@@ -57,6 +58,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         if (error) throw error;
       },
       signOut: async () => {
+        setActiveProfileId(null);
         const { error } = await supabase.auth.signOut();
         if (error) throw error;
       },

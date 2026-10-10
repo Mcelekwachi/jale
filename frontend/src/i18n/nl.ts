@@ -258,4 +258,56 @@ export const nl = {
     sendReport: "Melding versturen",
     cancel: "Annuleren",
   },
+  family: {
+    ageTitle: "Voordat we beginnen",
+    ageIntro:
+      "Voor leerlingen onder de 16 moet een ouder of voogd Jalɛ instellen.",
+    ageAdult: "Ik ben 16 of ouder",
+    ageParent: "Ik ben ouder of voogd en stel dit in voor mijn kind",
+    ageUnder: "Ik ben jonger dan 16",
+    underTitle: "Vraag een ouder of voogd",
+    underBody:
+      "Een ouder of voogd moet Jalɛ voor jou instellen op een eigen account. We verwijderen de inloggegevens die we net hebben verzameld.",
+    underConfirm: "Mijn gegevens verwijderen en uitloggen",
+    ageError: "Dat kon niet worden opgeslagen. Probeer het opnieuw.",
+    title: "Gezin",
+    intro:
+      "Voeg een profiel voor je kind toe. Kinderen hebben geen e-mailadres of login nodig.",
+    none: "Nog geen kinderprofielen.",
+    nickname: "Bijnaam",
+    nicknameHint: "Gebruik een bijnaam, geen volledige naam.",
+    birthYear: "Geboortejaar",
+    consent:
+      "Ik ben de ouder of wettelijk voogd van dit kind. Ik geef toestemming dat Jalɛ de bijnaam, het geboortejaar en de leervoortgang bewaart zodat het kind kan leren. Ik kan deze gegevens altijd downloaden of verwijderen.",
+    addChild: "Kind toevoegen",
+    switchTo: "Naar dit profiel wisselen",
+    download: "Gegevens downloaden",
+    remove: "Profiel verwijderen",
+    removeConfirm:
+      "Dit profiel en alle voortgang verwijderen? Dit kan niet ongedaan worden gemaakt.",
+    confirmYes: "Ja, verwijderen",
+    cancel: "Annuleren",
+    exportAll: "Al mijn gegevens downloaden",
+    deleteAccount: "Mijn account verwijderen",
+    deleteAccountConfirm:
+      "Dit wist je account, alle kinderprofielen en alle voortgang. Dit kan niet ongedaan worden gemaakt.",
+    pinTitle: "Ouder-pincode",
+    pinIntro:
+      "Een pincode voorkomt dat kinderen hun profiel verlaten op een gedeeld apparaat.",
+    pinLabel: "Pincode (4 tot 8 cijfers)",
+    pinSave: "Pincode opslaan",
+    pinSaved: "Pincode opgeslagen.",
+    pinIsSet: "Er is een pincode ingesteld.",
+    learningAs: "Aan het leren als",
+    myProfile: "Mijn profiel",
+    backToParent: "Terug naar ouder",
+    enterPin: "Voer de ouder-pincode in",
+    pinWrong: "Die pincode klopt niet.",
+    unlock: "Ontgrendelen",
+    parentsOnly: "Instellingen zijn voor ouders.",
+    switchOffline:
+      "Maak verbinding met internet om van profiel te wisselen, zodat de voortgang eerst wordt opgeslagen.",
+    loadError: "Gezinsinstellingen laden mislukt",
+    saveError: "Wijzigingen opslaan mislukt",
+  },
 } satisfies DeepPartial<UiStrings>;

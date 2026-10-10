@@ -6,6 +6,7 @@ import { PwaPrompts } from "./pwa/PwaPrompts";
 import { UpdatePrompt } from "./pwa/UpdatePrompt";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { OnboardingGuard } from "./auth/OnboardingGuard";
+import { AgeGate } from "./routes/AgeGate";
 import { AuthCallback } from "./routes/AuthCallback";
 import { Home } from "./routes/Home";
 import { Onboarding } from "./routes/Onboarding";
@@ -60,6 +61,7 @@ export function App() {
                 </AdminErrorBoundary>
               }
             />
+            <Route path="/age" element={<AgeGate />} />
             <Route path="/onboarding" element={<Onboarding />} />
             <Route path="/onboarding/:step" element={<Onboarding />} />
             <Route element={<OnboardingGuard />}>

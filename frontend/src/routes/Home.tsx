@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { ProfileBar } from "../family/ProfileBar";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { Spinner } from "../components/Spinner";
 import { apiFetch } from "../lib/api";
@@ -114,6 +115,7 @@ export function Home() {
             {strings.settings}
           </Link>
         </header>
+        <ProfileBar />
         <section className="rounded-[2rem] bg-indigo-deep p-6 text-cream shadow-card">
           {stats.current_streak === 0 ? (
             <h1 className="font-display text-3xl">{strings.startStreak}</h1>

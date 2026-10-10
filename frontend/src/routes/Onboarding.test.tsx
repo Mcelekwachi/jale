@@ -69,6 +69,7 @@ function profile(overrides: Record<string, unknown> = {}) {
     role: "learner",
     is_active: true,
     created_at: "2026-08-02T00:00:00Z",
+    age_confirmed_at: "2026-10-10T00:00:00Z",
     preferences: { ...basePreferences, ...overrides },
   };
 }

@@ -254,6 +254,57 @@ export const en = {
     sendReport: "Send report",
     cancel: "Cancel",
   },
+  family: {
+    ageTitle: "Before we start",
+    ageIntro:
+      "Learners under 16 need a parent or guardian to set up Jalɛ for them.",
+    ageAdult: "I’m 16 or older",
+    ageParent: "I’m a parent or guardian setting this up for my child",
+    ageUnder: "I’m under 16",
+    underTitle: "Please ask a parent or guardian",
+    underBody:
+      "A parent or guardian needs to set Jalɛ up for you on their own account. We will remove the sign-in details we just collected.",
+    underConfirm: "Remove my details and sign out",
+    ageError: "We could not save that. Please try again.",
+    title: "Family",
+    intro:
+      "Add a profile for your child. Children don’t need an email or a login.",
+    none: "No child profiles yet.",
+    nickname: "Nickname",
+    nicknameHint: "Use a nickname, not a full name.",
+    birthYear: "Year of birth",
+    consent:
+      "I am this child’s parent or legal guardian. I consent to Jalɛ keeping their nickname, year of birth and learning progress so they can learn. I can download or delete this data at any time.",
+    addChild: "Add child",
+    switchTo: "Switch to this profile",
+    download: "Download data",
+    remove: "Delete profile",
+    removeConfirm:
+      "Delete this profile and all its progress? This cannot be undone.",
+    confirmYes: "Yes, delete",
+    cancel: "Cancel",
+    exportAll: "Download all my data",
+    deleteAccount: "Delete my account",
+    deleteAccountConfirm:
+      "This erases your account, every child profile and all progress. This cannot be undone.",
+    pinTitle: "Parent PIN",
+    pinIntro: "A PIN stops children leaving their profile on a shared device.",
+    pinLabel: "PIN (4 to 8 digits)",
+    pinSave: "Save PIN",
+    pinSaved: "PIN saved.",
+    pinIsSet: "A PIN is set.",
+    learningAs: "Learning as",
+    myProfile: "My profile",
+    backToParent: "Back to parent",
+    enterPin: "Enter parent PIN",
+    pinWrong: "That PIN is not correct.",
+    unlock: "Unlock",
+    parentsOnly: "Settings are for parents.",
+    switchOffline:
+      "Connect to the internet to switch profiles, so progress is saved first.",
+    loadError: "Unable to load family settings",
+    saveError: "Unable to save changes",
+  },
 } as const;
 
 export type UiStrings = typeof en;
