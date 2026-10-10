@@ -1,6 +1,6 @@
 # Proposal: parental consent and child profiles
 
-Status: **proposal, nothing built**. Tier B (schema, auth, privacy). Needs Michael's approval before any code.
+Status: **approved by Michael 2026-10-10 (Q1-Q7: yes to all; keep it simple, no extra knobs)**. Tier B (schema, auth, privacy).
 Decided so far (Michael, 2026-10-09): consent age 16; under-16s are not excluded; a parent sets up the child; child profiles live under the parent; Resend as mail sender.
 
 ## What the user sees
@@ -19,12 +19,12 @@ Every progress table (`user_progress`, `user_daily_activity`, `user_stats`, `stu
 - `app_users.parent_user_id UUID NULL REFERENCES app_users(id) ON DELETE CASCADE` (NULL = adult). Deleting the parent erases the children.
 - `app_users.birth_year SMALLINT NULL` (children only; year, not date).
 - `app_users.age_confirmed_at TIMESTAMPTZ NULL` (NULL = must pass the age gate; existing 5 users are gated at next sign-in).
-- New `parental_consents(id, parent_user_id, child_user_id, status granted|withdrawn, policy_version, granted_at, withdrawn_at)`: the evidence record. No IP, no free text.
+- New `parental_consents(id, parent_user_id, child_user_id, policy_version, granted_at)`: the evidence record while the child exists. No IP, no free text. Withdrawal = deleting the child, which erases the row too.
 - Child rows: `email NULL`, `share_slug NULL`, `role = learner` (CHECK: a child can never be admin/contributor).
 - New tables get RLS enabled explicitly in `schema.sql` (matching the live database).
 
 ### API (all under the parent's token)
-- `GET/POST /v1/me/children`, `DELETE /v1/me/children/{id}`, `POST /v1/me/children/{id}/pause`
+- `GET/POST /v1/me/children`, `DELETE /v1/me/children/{id}` (deleting withdraws consent and erases the child's data). No pause endpoint: keep it simple.
 - `GET /v1/me/children/{id}/export` and `GET /v1/me/export` (JSON)
 - `DELETE /v1/me` (account deletion; children cascade) - also closes review finding F5
 - `POST /v1/me/age` (age gate answer)
@@ -51,3 +51,6 @@ The parent is signed in with a verified email (magic link or Google), ticks a ve
 - Q5 Existing 5 users get the age gate on next sign-in: OK?
 - Q6 16-17-year-olds sign up on their own without parental consent (research says no statutory requirement; one source disagrees): OK pending lawyer check?
 - Q7 Privacy policy and consent wording: I draft, a lawyer reviews before launch with real children.
+
+## Decisions (Michael, 2026-10-10)
+Q1-Q7 all approved. Constraint: do not over-parametrize. Consequences: one optional env var (`SUPABASE_SERVICE_ROLE_KEY`, set by Michael on Render, used only to delete the login on account deletion); the parent PIN is a simple hashed PIN, a soft lock on the device (no lockout logic); no pause endpoint; one consent policy version constant in code.
