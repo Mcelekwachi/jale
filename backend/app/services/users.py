@@ -149,6 +149,7 @@ async def get_user_profile(user_id: uuid.UUID) -> dict[str, Any]:
             """
             SELECT u.id, u.email, u.display_name, u.avatar_url, u.role,
                    u.share_slug, u.is_active, u.created_at, u.last_seen_at,
+                   u.age_confirmed_at, (u.parent_user_id IS NOT NULL) AS is_child,
                    (to_jsonb(p) - 'active_language_id' - 'meta_language_id')
                    || jsonb_build_object(
                           'active_language', active_language.code,

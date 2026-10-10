@@ -19,6 +19,7 @@ SELECT u.display_name,
   JOIN languages language ON language.id=preferences.active_language_id
  WHERE u.share_slug=%(share_slug)s
    AND u.is_active
+   AND u.parent_user_id IS NULL
 """
 
 

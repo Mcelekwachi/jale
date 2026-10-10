@@ -38,6 +38,8 @@ class Settings:
             raise ValueError("SUPABASE_PROJECT_URL must be a valid https URL")
         self.supabase_project_url: str = project_url
         self.supabase_jwt_audience: str = os.getenv("SUPABASE_JWT_AUDIENCE", "authenticated")
+        # Optional. Only used to delete a person's login when they delete their account.
+        self.supabase_service_role_key: str | None = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or None
 
         # Vercel preview deployments get their own URL per branch, so the
         # frontend origin list has to be configurable rather than hardcoded.

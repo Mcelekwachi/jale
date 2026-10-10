@@ -9,6 +9,7 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.config import get_settings
+from app.services.children import get_child_for_parent
 from app.services.users import provision_user
 
 _bearer = HTTPBearer(auto_error=False)
@@ -60,10 +61,33 @@ def _decode(credentials: HTTPAuthorizationCredentials | None) -> dict[str, Any]:
     return claims
 
 
-async def current_user(
+async def current_account(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> dict[str, Any]:
+    """The signed-in person themselves, ignoring any selected child profile."""
     return await provision_user(_decode(credentials))
+
+
+async def current_user(
+    request: Request,
+    account: Annotated[dict[str, Any], Depends(current_account)],
+) -> dict[str, Any]:
+    """The learner the request is for: the account, or one of its child profiles.
+
+    A parent selects a child with the X-Profile-Id header. Only the parent's own
+    children can be selected, so the header can never reach another account.
+    """
+    raw = request.headers.get("x-profile-id")
+    if not raw:
+        return account
+    try:
+        child_id = uuid.UUID(raw)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid profile id") from None
+    child = await get_child_for_parent(account["id"], child_id)
+    if child is None:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    return child
 
 
 async def optional_current_user(
