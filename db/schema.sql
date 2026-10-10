@@ -251,6 +251,47 @@ ALTER TABLE app_users
   ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ;
 
+-- Child profiles. A child is an app_users row owned by a parent: no email, no
+-- login, no public slug, always a learner. Deleting the parent erases the
+-- children (and, through the existing cascades, everything keyed to them).
+-- age_confirmed_at is NULL until the person has passed the 16+ age gate.
+ALTER TABLE app_users
+  ADD COLUMN IF NOT EXISTS parent_user_id UUID REFERENCES app_users(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS birth_year SMALLINT,
+  ADD COLUMN IF NOT EXISTS age_confirmed_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS parent_pin_hash TEXT;
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+     WHERE conname = 'app_users_child_is_plain_learner'
+       AND conrelid = 'app_users'::regclass
+  ) THEN
+    ALTER TABLE app_users ADD CONSTRAINT app_users_child_is_plain_learner
+      CHECK (parent_user_id IS NULL
+             OR (role = 'learner' AND email IS NULL AND share_slug IS NULL));
+  END IF;
+END $$;
+CREATE INDEX IF NOT EXISTS app_users_parent_idx ON app_users (parent_user_id)
+  WHERE parent_user_id IS NOT NULL;
+
+-- Evidence that a parent consented to a child's profile. It lives exactly as
+-- long as the child does: withdrawing consent deletes the child and this row.
+CREATE TABLE IF NOT EXISTS parental_consents (
+  id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  parent_user_id  UUID NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  child_user_id   UUID NOT NULL UNIQUE REFERENCES app_users(id) ON DELETE CASCADE,
+  policy_version  TEXT NOT NULL,
+  granted_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE parental_consents
+  ADD COLUMN IF NOT EXISTS id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  ADD COLUMN IF NOT EXISTS parent_user_id UUID NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS child_user_id UUID NOT NULL UNIQUE REFERENCES app_users(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS policy_version TEXT NOT NULL,
+  ADD COLUMN IF NOT EXISTS granted_at TIMESTAMPTZ NOT NULL DEFAULT now();
+ALTER TABLE parental_consents ENABLE ROW LEVEL SECURITY;
+
 DO $$ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint

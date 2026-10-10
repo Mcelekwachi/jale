@@ -352,6 +352,8 @@ class UserProfile(BaseModel):
     is_active: bool
     created_at: datetime
     last_seen_at: datetime | None = None
+    age_confirmed_at: datetime | None = None
+    is_child: bool = False
     preferences: UserPreferences
 
 
