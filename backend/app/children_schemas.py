@@ -47,3 +47,7 @@ class PinBody(BaseModel):
 
 class PinResult(BaseModel):
     valid: bool
+
+
+class PinStatus(BaseModel):
+    has_pin: bool

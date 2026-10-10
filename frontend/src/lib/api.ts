@@ -1,3 +1,4 @@
+import { getActiveProfileId, setActiveProfileId } from "./activeProfile";
 import { getEnvironment } from "./env";
 import { supabase } from "./supabase";
 
@@ -67,6 +68,8 @@ export async function apiFetch<T>(
     if (request.body && !headers.has("Content-Type"))
       headers.set("Content-Type", "application/json");
     if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
+    const profileId = getActiveProfileId();
+    if (accessToken && profileId) headers.set("X-Profile-Id", profileId);
     return fetch(url, {
       ...request,
       headers: Object.fromEntries(headers.entries()),
@@ -93,8 +96,17 @@ export async function apiFetch<T>(
       }
     }
 
-    if (!response.ok)
-      throw new ApiError(response.status, await responseDetail(response));
+    if (!response.ok) {
+      const detail = await responseDetail(response);
+      if (response.status === 404 && detail === "Profile not found") {
+        // The selected child no longer exists (deleted elsewhere): fall back
+        // to the parent's own profile instead of failing every request.
+        setActiveProfileId(null);
+        window.history.replaceState({}, "", "/");
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      }
+      throw new ApiError(response.status, detail);
+    }
     if (response.status === 204) return undefined as T;
     return (await response.json()) as T;
   } catch (error) {

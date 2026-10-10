@@ -47,6 +47,11 @@ export function OnboardingGuard() {
         fullScreen
       />
     );
+  // Everyone passes the 16+ age gate once. Child profiles were created with
+  // a parent's consent, so they skip it.
+  if (!profile.is_child && !profile.age_confirmed_at) {
+    return <Navigate replace to="/age" />;
+  }
   if (profile.preferences.onboarding_status === "not_started") {
     return (
       <Navigate

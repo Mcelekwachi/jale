@@ -13,6 +13,7 @@ vi.mock("../auth/AuthProvider", () => ({
 vi.mock("../auth/ProtectedRoute", () => ({ ProtectedRoute: () => <Outlet /> }));
 vi.mock("../auth/useAuth", () => ({ useAuth: () => ({ signOut: vi.fn() }) }));
 vi.mock("../lib/api");
+vi.mock("../family/FamilySection", () => ({ FamilySection: () => null }));
 
 const mockedApiFetch = vi.mocked(apiFetch);
 
@@ -43,6 +44,7 @@ describe("settings", () => {
         role: "learner",
         is_active: true,
         created_at: "2026-08-02T00:00:00Z",
+        age_confirmed_at: "2026-10-10T00:00:00Z",
         preferences: {
           active_language: "ibo",
           meta_language: null,
@@ -60,6 +62,7 @@ describe("settings", () => {
     mockedApiFetch.mockImplementation(async (path) => {
       if (path === "/v1/languages/meta") return [] as never;
       return {
+        age_confirmed_at: "2026-10-10T00:00:00Z",
         preferences: {
           meta_language: "nld",
           reminder_enabled: false,
@@ -111,6 +114,7 @@ describe("settings", () => {
       if (path === "/v1/languages/meta") return [] as never;
       return {
         id: "user-1",
+        age_confirmed_at: "2026-10-10T00:00:00Z",
         preferences: {
           active_language: "ibo",
           age_band: "child_u13",

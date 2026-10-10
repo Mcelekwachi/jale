@@ -174,6 +174,7 @@ async def test_delete_account_erases_children_too(client, auth_headers, database
 async def test_parent_pin(client, auth_headers, database_url):
     parent_id, headers = await _parent(client, auth_headers)
     with isolated_test_users(parent_id):
+        assert (await client.get("/v1/me/pin", headers=headers)).json() == {"has_pin": False}
         assert (
             await client.post("/v1/me/pin/verify", headers=headers, json={"pin": "1234"})
         ).json() == {"valid": False}
@@ -189,6 +190,7 @@ async def test_parent_pin(client, auth_headers, database_url):
         assert (
             await client.put("/v1/me/pin", headers=headers, json={"pin": "12"})
         ).status_code == 422
+        assert (await client.get("/v1/me/pin", headers=headers)).json() == {"has_pin": True}
         with db_connection(database_url) as conn:
             stored = conn.execute(
                 "SELECT parent_pin_hash FROM app_users WHERE id = %s", (parent_id,)

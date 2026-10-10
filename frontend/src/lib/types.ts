@@ -247,7 +247,16 @@ export interface UserProfile {
   is_active: boolean;
   created_at: string;
   last_seen_at?: string | null;
+  age_confirmed_at?: string | null;
+  is_child?: boolean;
   preferences: UserPreferences;
+}
+
+export interface ChildProfile {
+  id: string;
+  nickname: string;
+  birth_year: number;
+  created_at: string;
 }
 
 export interface PublicProfileSummary {

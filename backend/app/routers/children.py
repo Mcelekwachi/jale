@@ -6,7 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Response
 
 from app.auth import current_account
-from app.children_schemas import Child, ChildCreate, PinBody, PinResult
+from app.children_schemas import Child, ChildCreate, PinBody, PinResult, PinStatus
 from app.schemas import UserProfile
 from app.services import children
 from app.services.users import get_user_profile
@@ -73,6 +73,11 @@ async def delete_me(account: Account, confirm: bool = False) -> Response:
             detail="This account has payment records that must be kept. Contact support.",
         )
     return Response(status_code=204)
+
+
+@router.get("/pin", response_model=PinStatus)
+async def pin_status(account: Account) -> dict:
+    return {"has_pin": await children.has_pin(account["id"])}
 
 
 @router.put("/pin", status_code=204)
